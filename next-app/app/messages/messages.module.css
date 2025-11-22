@@ -1,0 +1,167 @@
+.page {
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.container {
+  display: flex;
+  height: 90vh;
+  gap: 20px;
+}
+
+/* SIDEBAR */
+.sidebar {
+  width: 28%;
+  background: white;
+  padding: 18px;
+  border-radius: 12px;
+  overflow-y: auto;
+}
+
+.sidebarTitle {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 15px;
+}
+
+.chatItem {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  background: #f9fafc;
+  cursor: pointer;
+}
+
+.chatItem:hover {
+  background: #eef3ff;
+}
+
+.chatAvatar {
+  width: 38px;
+  height: 38px;
+  background: #c7d9ff;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: 600;
+}
+
+.chatInfo {
+  flex: 1;
+}
+
+.chatName {
+  font-weight: 600;
+  margin: 0;
+}
+
+.chatRoute {
+  font-size: 12px;
+  color: #666;
+}
+
+.chatMsg {
+  font-size: 12px;
+  color: #444;
+  margin-top: 3px;
+}
+
+.chatTime {
+  font-size: 11px;
+  color: #777;
+}
+
+/* CHAT WINDOW */
+.chatWindow {
+  flex: 1;
+  background: white;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* HEADER */
+.header {
+  display: flex;
+  gap: 12px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.headerAvatar {
+  width: 40px;
+  height: 40px;
+  background: #c7d9ff;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.headerName {
+  font-weight: 600;
+}
+
+.headerRoute {
+  font-size: 12px;
+  color: #666;
+}
+
+/* MESSAGES AREA */
+.messages {
+  flex: 1;
+  margin-top: 20px;
+  overflow-y: auto;
+}
+
+/* MESSAGE BUBBLES */
+.msgBox {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.msgBoxRight {
+  display: flex;
+  flex-direction: row-reverse;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.msgBubbleGray {
+  background: #f2f2f2;
+  padding: 10px 14px;
+  border-radius: 10px;
+  max-width: 70%;
+}
+
+.msgBubbleBlue {
+  background: #2a61ff;
+  color: white;
+  padding: 10px 14px;
+  border-radius: 10px;
+  max-width: 70%;
+}
+
+.msgSender,
+.msgSenderRight {
+  width: 28px;
+  height: 28px;
+  background: #c7d9ff;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 12px;
+}
+
+.msgTime {
+  font-size: 11px;
+  color: #888;
+  display: block;
+  margin-bottom: 10px;
+}

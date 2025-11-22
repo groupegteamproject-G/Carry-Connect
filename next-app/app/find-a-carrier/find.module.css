@@ -1,0 +1,198 @@
+/* ---------- PAGE WRAPPER ---------- */
+.pageWrapper {
+  background: #f5f7fb;
+  min-height: 60vh;
+  padding-top: 60px;
+}
+
+/* ---------- SEARCH CARD ---------- */
+.searchCard {
+  background: white;
+  padding: 20px;
+  width: 90%;
+  max-width: 1150px;
+  margin: 0 auto;
+  border-radius: 12px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+}
+
+.searchRow {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 15px;
+}
+
+.inputBox label {
+  font-size: 12px;
+  color: #666;
+}
+
+.inputBox input,
+.inputBox select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+.searchBtn {
+  background: #2d5bff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.searchBtn:hover {
+  background: #244bcc;
+}
+
+/* ---------- ACTION BUTTONS (Filters / List) ---------- */
+.topActions {
+  width: 90%;
+  max-width: 1150px;
+  margin: 18px auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.filterBtn,
+.listBtn {
+  background: white;
+  border: 1px solid #ddd;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.filterBtn:hover,
+.listBtn:hover {
+  background: #f2f5ff;
+}
+
+/* ---------- PAGE TITLES ---------- */
+.sectionTitle {
+  width: 90%;
+  max-width: 1150px;
+  margin: 20px auto 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.resultCount {
+  width: 90%;
+  max-width: 1150px;
+  margin: 2px auto 18px;
+  color: #777;
+  font-size: 14px;
+}
+
+/* ---------- GRID ---------- */
+.cardsGrid {
+  width: 90%;
+  max-width: 1150px;
+  margin: 0 auto 60px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+/* ---------- INDIVIDUAL CARD ---------- */
+.card {
+  background: white;
+  padding: 18px;
+  border-radius: 12px;
+  border: 1px solid #e5e5e5;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+}
+
+.cardHeader {
+  display: flex;
+  gap: 12px;
+  position: relative;
+}
+
+.avatar {
+  width: 42px;
+  height: 42px;
+  background: #d8e2ff;
+  border-radius: 50%;
+}
+
+.badge {
+  position: absolute;
+  right: 0;
+  top: 0;
+  background: #e9efff;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.cardName {
+  font-size: 16px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.cardSub {
+  font-size: 13px;
+  color: #555;
+}
+
+.cardDate {
+  font-size: 12px;
+  color: #777;
+  margin-top: 2px;
+}
+
+.cardBody {
+  margin-top: 12px;
+  color: #444;
+  font-size: 14px;
+}
+
+.cardBody i {
+  margin-right: 6px;
+  color: #777;
+}
+
+.cardFooter {
+  margin-top: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.price {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.bookBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  background: #295bff;
+  color: white;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.bookBtn:hover {
+  background: #204acc;
+}
+
+/* Make the search box behave nicely on this page */
+.searchBoxFind {
+  max-width: 1150px;
+  margin: 0 auto 20px !important;
+  position: static !important; /* in case home version used absolute/relative */
+}
