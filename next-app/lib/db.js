@@ -24,13 +24,13 @@ import { db, auth } from "./firebase";
 // Re-export auth and db
 export { auth, db };
 
-// ============ AUTH FUNCTIONS ============
+// Authentication Functions
 export const signUp = (email, password) => createUserWithEmailAndPassword(auth, email, password);
 export const signIn = (email, password) => signInWithEmailAndPassword(auth, email, password);
 export const logOut = () => signOut(auth);
 export const onAuthChange = (callback) => onAuthStateChanged(auth, callback);
 
-// ============ USER PROFILES ============
+// User Profile Management
 export const saveUserProfile = async (name, phone) => {
   if (!auth.currentUser) return;
   await updateDoc(doc(db, "users", auth.currentUser.uid), {
@@ -66,7 +66,7 @@ export async function setUserProfile(userId, profileData) {
   }
 }
 
-// ============ TRIPS (Carriers) ============
+// Trip Management (Carriers)
 
 // Post a trip (Carrier)
 export const postTrip = async ({ from, to, date, transportType, packageSize, price, description = "" }) => {
@@ -139,7 +139,7 @@ export async function getCarriers(filters = {}) {
   }
 }
 
-// ============ BOOKINGS (Shippers) ============
+// Booking Management (Shippers)
 
 // Book a trip
 export const bookTrip = async (tripId, { weight, pickupLocation, dropoffLocation, reward }) => {
@@ -173,7 +173,7 @@ export const listenToMyBookings = (callback) => {
   });
 };
 
-// ============ MESSAGES & CHAT ============
+// Messaging System
 
 let currentTripId = null;
 export const setCurrentTripId = (id) => currentTripId = id;

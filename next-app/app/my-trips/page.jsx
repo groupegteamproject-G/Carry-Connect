@@ -11,44 +11,54 @@ export default function MyTripsPage() {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+
   useEffect(() => {
+    let unsubscribe = () => { };
+
     async function loadUserTrips() {
       try {
         const { getCurrentUser } = await import("../../lib/auth");
         const currentUser = await getCurrentUser();
 
         if (!currentUser) {
-          alert("Please login first!");
           router.push("/auth");
           return;
         }
 
         setUser(currentUser);
 
-        const { getUserTrips } = await import("../../lib/db");
-        const userTrips = await getUserTrips(currentUser.uid);
-        setTrips(userTrips);
+        const { listenToMyTrips } = await import("../../lib/db");
+        unsubscribe = listenToMyTrips((userTrips) => {
+          setTrips(userTrips);
+          setLoading(false);
+        });
       } catch (error) {
         console.error("Error loading trips:", error);
-      } finally {
         setLoading(false);
       }
     }
 
     loadUserTrips();
+    return () => unsubscribe();
   }, [router]);
 
   const handleDelete = async (tripId) => {
     if (!confirm("Are you sure you want to delete this trip?")) return;
+    setSuccessMsg("");
+    setErrorMsg("");
 
     try {
       const { deleteTrip } = await import("../../lib/db");
       await deleteTrip(tripId);
-      setTrips(trips.filter(trip => trip.id !== tripId));
-      alert("Trip deleted successfully!");
+      // setTrips is handled by the listener automatically
+      setSuccessMsg("Trip deleted successfully!");
+      setTimeout(() => setSuccessMsg(""), 3000);
     } catch (error) {
       console.error("Error deleting trip:", error);
-      alert("Failed to delete trip");
+      setErrorMsg("Failed to delete trip");
+      setTimeout(() => setErrorMsg(""), 3000);
     }
   };
 
@@ -68,6 +78,17 @@ export default function MyTripsPage() {
           + Add New Trip
         </Link>
       </div>
+
+      {successMsg && (
+        <div style={{ color: 'green', background: '#e6fffa', padding: '10px', borderRadius: '5px', marginBottom: '15px', textAlign: 'center' }}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div style={{ color: 'red', background: '#ffe6e6', padding: '10px', borderRadius: '5px', marginBottom: '15px', textAlign: 'center' }}>
+          {errorMsg}
+        </div>
+      )}
 
       {trips.length === 0 ? (
         <div className={styles.empty}>

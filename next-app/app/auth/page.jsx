@@ -23,22 +23,25 @@ export default function AuthPage() {
     });
   };
 
+  const [successMsg, setSuccessMsg] = useState("");
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccessMsg("");
     setLoading(true);
 
     try {
       const { signIn, signUp } = await import("../../lib/auth");
-      
+
       if (isLogin) {
         await signIn(formData.email, formData.password);
-        alert("Login successful!");
-        router.push("/");
+        setSuccessMsg("Login successful! Redirecting...");
+        setTimeout(() => router.push("/"), 1500);
       } else {
         await signUp(formData.email, formData.password, formData.name, formData.phone);
-        alert("Account created successfully!");
-        router.push("/");
+        setSuccessMsg("Account created successfully! Redirecting...");
+        setTimeout(() => router.push("/"), 1500);
       }
     } catch (err) {
       setError(err.message || "An error occurred");
@@ -117,8 +120,14 @@ export default function AuthPage() {
             </div>
           )}
 
-          <button 
-            type="submit" 
+          {successMsg && (
+            <div className={styles.success} style={{ color: 'green', background: '#e6fffa', padding: '10px', borderRadius: '5px', marginBottom: '15px', textAlign: 'center' }}>
+              {successMsg}
+            </div>
+          )}
+
+          <button
+            type="submit"
             className={styles.submitBtn}
             disabled={loading}
           >

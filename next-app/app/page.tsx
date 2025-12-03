@@ -22,12 +22,16 @@ export default function Home() {
             </p>
 
             <div className="buttons">
-              <button className="primary-btn">
-                <i className="fa-solid fa-box-open"></i> Find a Carrier
-              </button>
-              <button className="secondary-btn">
-                <i className="fa-solid fa-plane"></i> Add Your Trip
-              </button>
+              <Link href="/find-a-carrier">
+                <button className="primary-btn">
+                  <i className="fa-solid fa-box-open"></i> Find a Carrier
+                </button>
+              </Link>
+              <Link href="/add-trip">
+                <button className="secondary-btn">
+                  <i className="fa-solid fa-plane"></i> Add Your Trip
+                </button>
+              </Link>
             </div>
           </div>
 
@@ -200,12 +204,16 @@ export default function Home() {
           </p>
 
           <div className="cta-buttons">
-            <button className="white-btn">
-              <i className="fa-solid fa-box"></i> Find a Carrier
-            </button>
-            <button className="white-outline-btn">
-              <i className="fa-solid fa-plane"></i> Add Your Trip
-            </button>
+            <Link href="/find-a-carrier">
+              <button className="white-btn">
+                <i className="fa-solid fa-box"></i> Find a Carrier
+              </button>
+            </Link>
+            <Link href="/add-trip">
+              <button className="white-outline-btn">
+                <i className="fa-solid fa-plane"></i> Add Your Trip
+              </button>
+            </Link>
           </div>
         </div>
       </section>

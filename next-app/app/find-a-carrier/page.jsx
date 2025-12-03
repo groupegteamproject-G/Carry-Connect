@@ -9,24 +9,26 @@ export default function FindCarrierPage() {
   const [carriers, setCarriers] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [user, setUser] = useState(null);
+
   useEffect(() => {
     // Only load Firebase on client side
     async function loadCarriers() {
       try {
-        const { listenToAvailableTrips } = await import("../../lib/db");
-        // Note: listenToAvailableTrips returns an unsubscribe function, but here we just want the data once?
-        // Or we should use the real-time listener.
-        // The original code used getCarriers which was a one-time fetch.
-        // lib/db.js has listenToAvailableTrips.
-        // I should probably adapt it to use the listener properly or just fetch once.
-        // For now, let's use the listener and set state.
+        const { listenToAvailableTrips, auth, onAuthChange } = await import("../../lib/db");
 
-        const unsubscribe = listenToAvailableTrips((data) => {
+        // Listen to auth state
+        const unsubscribeAuth = onAuthChange((u) => setUser(u));
+
+        const unsubscribeTrips = listenToAvailableTrips((data) => {
           setCarriers(data);
           setLoading(false);
         });
 
-        return () => unsubscribe();
+        return () => {
+          unsubscribeAuth();
+          unsubscribeTrips();
+        };
       } catch (error) {
         console.error("Error loading carriers:", error);
         setLoading(false);
@@ -89,37 +91,49 @@ export default function FindCarrierPage() {
         </div>
       ) : (
         <div className={styles.cardsGrid}>
-          {carriers.map((carrier) => (
-            <div key={carrier.id} className={styles.card}>
-              <div className={styles.cardHeader}>
-                <div className={styles.avatar}>{carrier.avatar || carrier.userName?.charAt(0) || 'U'}</div>
-                <div>
-                  <h3 className={styles.cardName}>{carrier.userName || carrier.name || 'Carrier'}</h3>
-                  <p className={styles.cardSub}>{carrier.from} → {carrier.to}</p>
-                  <p className={styles.cardDate}>{carrier.date ? new Date(carrier.date).toLocaleDateString() : 'Date'}</p>
+          {carriers.map((carrier) => {
+            const isMyTrip = user && carrier.carrierUid === user.uid;
+            return (
+              <div key={carrier.id} className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <div className={styles.avatar}>{carrier.avatar || carrier.userName?.charAt(0) || 'U'}</div>
+                  <div>
+                    <h3 className={styles.cardName}>
+                      {carrier.userName || carrier.name || 'Carrier'}
+                      {isMyTrip && <span style={{ fontSize: '12px', color: '#667eea', marginLeft: '8px' }}>(You)</span>}
+                    </h3>
+                    <p className={styles.cardSub}>{carrier.from} → {carrier.to}</p>
+                    <p className={styles.cardDate}>{carrier.date ? new Date(carrier.date).toLocaleDateString() : 'Date'}</p>
+                  </div>
+                  <span className={styles.badge}>{carrier.transportType}</span>
                 </div>
-                <span className={styles.badge}>{carrier.transportType}</span>
-              </div>
 
-              <div className={styles.cardBody}>
-                <p>
-                  <i className="fa-solid fa-box"></i> {carrier.packageSize}
-                </p>
-                {carrier.description && (
-                  <p style={{ fontSize: '14px', color: '#666', marginTop: '10px' }}>
-                    {carrier.description}
+                <div className={styles.cardBody}>
+                  <p>
+                    <i className="fa-solid fa-box"></i> {carrier.packageSize}
                   </p>
-                )}
-              </div>
+                  {carrier.description && (
+                    <p style={{ fontSize: '14px', color: '#666', marginTop: '10px' }}>
+                      {carrier.description}
+                    </p>
+                  )}
+                </div>
 
-              <div className={styles.cardFooter}>
-                <h3 className={styles.price}>${carrier.price}</h3>
-                <Link href={`/booking/${carrier.id}`} className={styles.bookBtn}>
-                  Book Now
-                </Link>
+                <div className={styles.cardFooter}>
+                  <h3 className={styles.price}>${carrier.price}</h3>
+                  {isMyTrip ? (
+                    <button disabled className={styles.bookBtn} style={{ opacity: 0.5, cursor: 'not-allowed', background: '#ccc' }}>
+                      Your Trip
+                    </button>
+                  ) : (
+                    <Link href={`/booking/${carrier.id}`} className={styles.bookBtn}>
+                      Book Now
+                    </Link>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </main>

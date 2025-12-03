@@ -16,7 +16,7 @@ export default function MessagesPage() {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef(null);
 
-  //FAKE+REAL
+  // Mock data for initial display (will be replaced by real data)
   const chats = [
     { tripId: "demo123", name: "Alex Johnson", route: "New York → London, Aug 15", lastMessage: "Yes I can take your book", avatar: "A" },
     { tripId: "demo456", name: "Maria Garcia", route: "Paris → Berlin, Aug 18", lastMessage: "Thanks!", avatar: "M" },

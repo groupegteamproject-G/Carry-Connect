@@ -163,8 +163,8 @@ Carry-Connect/
 │   │   └── page.tsx
 │   ├── lib/               # Firebase configuration
 │   │   ├── firebase.js    # Firebase initialization
-│   │   ├── auth.js        # Authentication helpers
-│   │   └── firestore.js   # Database helpers
+│   │   ├── firebase.js    # Firebase initialization
+│   │   └── db.js          # Database and Auth helpers
 │   ├── public/            # Static assets
 │   └── package.json
 ├── db/                    # Firestore configuration
@@ -229,7 +229,7 @@ The Firestore security rules are configured to:
 
 ## 📝 License
 
-This project is for educational purposes.
+This project is licensed under the MIT License.
 
 ## 🐛 Troubleshooting
 

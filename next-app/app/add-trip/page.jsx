@@ -39,40 +39,6 @@ export default function AddTripPage() {
   }, [router]);
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    console.log("Submitting trip form...", formData);
-    setLoading(true);
-
-    try {
-      console.log("Importing postTrip...");
-      const { postTrip } = await import("../../lib/db");
-
-      console.log("Calling postTrip...");
-      await postTrip({
-        ...formData,
-        price: parseFloat(formData.price),
-        // userId and other fields are handled inside postTrip using auth.currentUser
-      });
-
-      console.log("Trip posted successfully!");
-      alert("Trip posted successfully!");
-      router.push("/my-trips");
-    } catch (error) {
-      console.error("Error creating trip:", error);
-      alert("Failed to create trip: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!user) {
     return (
       <div className={styles.container}>
         <div className={styles.loading}>Checking authentication...</div>
@@ -89,6 +55,16 @@ export default function AddTripPage() {
         </p>
 
         <form onSubmit={handleSubmit} className={styles.form}>
+          {errorMsg && (
+            <div style={{ color: 'red', background: '#ffe6e6', padding: '10px', borderRadius: '5px', marginBottom: '15px', textAlign: 'center' }}>
+              {errorMsg}
+            </div>
+          )}
+          {successMsg && (
+            <div style={{ color: 'green', background: '#e6fffa', padding: '10px', borderRadius: '5px', marginBottom: '15px', textAlign: 'center' }}>
+              {successMsg}
+            </div>
+          )}
           <div className={styles.row}>
             <div className={styles.inputGroup}>
               <label>From (Origin)</label>
