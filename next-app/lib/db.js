@@ -70,14 +70,26 @@ export async function setUserProfile(userId, profileData) {
 
 // Post a trip (Carrier)
 export const postTrip = async ({ from, to, date, transportType, packageSize, price, description = "" }) => {
-  if (!auth.currentUser) throw new Error("Login required");
-  const tripRef = await addDoc(collection(db, "trips"), {
-    from, to, date: new Date(date), transportType, packageSize, price: Number(price),
-    description, carrierUid: auth.currentUser.uid, carrierEmail: auth.currentUser.email,
-    carrierName: auth.currentUser.displayName || auth.currentUser.email,
-    status: "available", createdAt: serverTimestamp()
-  });
-  return tripRef.id;
+  console.log("postTrip called with:", { from, to, date, transportType, packageSize, price, description });
+  if (!auth.currentUser) {
+    console.error("postTrip: No current user!");
+    throw new Error("Login required");
+  }
+  console.log("postTrip: User authenticated:", auth.currentUser.uid);
+
+  try {
+    const tripRef = await addDoc(collection(db, "trips"), {
+      from, to, date: new Date(date), transportType, packageSize, price: Number(price),
+      description, carrierUid: auth.currentUser.uid, carrierEmail: auth.currentUser.email,
+      carrierName: auth.currentUser.displayName || auth.currentUser.email,
+      status: "available", createdAt: serverTimestamp()
+    });
+    console.log("postTrip: Trip created with ID:", tripRef.id);
+    return tripRef.id;
+  } catch (e) {
+    console.error("postTrip: Error adding doc:", e);
+    throw e;
+  }
 };
 
 // Get all available carriers/trips (Find Carrier page)

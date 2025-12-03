@@ -47,17 +47,21 @@ export default function AddTripPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log("Submitting trip form...", formData);
     setLoading(true);
 
     try {
+      console.log("Importing postTrip...");
       const { postTrip } = await import("../../lib/db");
 
+      console.log("Calling postTrip...");
       await postTrip({
         ...formData,
         price: parseFloat(formData.price),
         // userId and other fields are handled inside postTrip using auth.currentUser
       });
 
+      console.log("Trip posted successfully!");
       alert("Trip posted successfully!");
       router.push("/my-trips");
     } catch (error) {
