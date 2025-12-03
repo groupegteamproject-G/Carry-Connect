@@ -8,7 +8,7 @@ import {
   listenToTripChat,
   auth,
   onAuthChange,
-} from "/db.js";
+} from "../../lib/db";
 
 export default function MessagesPage() {
   const [selectedTrip, setSelectedTrip] = useState(null);
@@ -20,7 +20,7 @@ export default function MessagesPage() {
   const chats = [
     { tripId: "demo123", name: "Alex Johnson", route: "New York → London, Aug 15", lastMessage: "Yes I can take your book", avatar: "A" },
     { tripId: "demo456", name: "Maria Garcia", route: "Paris → Berlin, Aug 18", lastMessage: "Thanks!", avatar: "M" },
-    { tripId: "demo789", name: "David Smith",   route: "Tokyo → Seoul, Aug 22",   lastMessage: "Package ready", avatar: "D" },
+    { tripId: "demo789", name: "David Smith", route: "Tokyo → Seoul, Aug 22", lastMessage: "Package ready", avatar: "D" },
   ];
 
   // Auto scroll to bottom

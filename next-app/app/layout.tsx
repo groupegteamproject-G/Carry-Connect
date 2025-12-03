@@ -27,7 +27,7 @@ export default function RootLayout({
         <Navbar />
 
         {/* MAIN PAGE CONTENT */}
-        <main>{children}</main>
+        {children}
 
         {/* FOOTER (always at bottom) */}
         <Footer />

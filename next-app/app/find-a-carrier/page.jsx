@@ -13,16 +13,26 @@ export default function FindCarrierPage() {
     // Only load Firebase on client side
     async function loadCarriers() {
       try {
-        const { getCarriers } = await import("../../lib/firestore");
-        const data = await getCarriers();
-        setCarriers(data);
+        const { listenToAvailableTrips } = await import("../../lib/db");
+        // Note: listenToAvailableTrips returns an unsubscribe function, but here we just want the data once?
+        // Or we should use the real-time listener.
+        // The original code used getCarriers which was a one-time fetch.
+        // lib/db.js has listenToAvailableTrips.
+        // I should probably adapt it to use the listener properly or just fetch once.
+        // For now, let's use the listener and set state.
+
+        const unsubscribe = listenToAvailableTrips((data) => {
+          setCarriers(data);
+          setLoading(false);
+        });
+
+        return () => unsubscribe();
       } catch (error) {
         console.error("Error loading carriers:", error);
-      } finally {
         setLoading(false);
       }
     }
-    
+
     loadCarriers();
   }, []);
 
@@ -86,7 +96,7 @@ export default function FindCarrierPage() {
                 <div>
                   <h3 className={styles.cardName}>{carrier.userName || carrier.name || 'Carrier'}</h3>
                   <p className={styles.cardSub}>{carrier.from} → {carrier.to}</p>
-                  <p className={styles.cardDate}>{carrier.date}</p>
+                  <p className={styles.cardDate}>{carrier.date ? new Date(carrier.date).toLocaleDateString() : 'Date'}</p>
                 </div>
                 <span className={styles.badge}>{carrier.transportType}</span>
               </div>

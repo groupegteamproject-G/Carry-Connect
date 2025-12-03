@@ -50,16 +50,12 @@ export default function AddTripPage() {
     setLoading(true);
 
     try {
-      const { createTrip } = await import("../../lib/firestore");
-      
-      await createTrip({
+      const { postTrip } = await import("../../lib/db");
+
+      await postTrip({
         ...formData,
         price: parseFloat(formData.price),
-        userId: user.uid,
-        userName: user.displayName || user.email,
-        userEmail: user.email,
-        status: "available",
-        createdAt: new Date()
+        // userId and other fields are handled inside postTrip using auth.currentUser
       });
 
       alert("Trip posted successfully!");
@@ -186,8 +182,8 @@ export default function AddTripPage() {
             />
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className={styles.submitBtn}
             disabled={loading}
           >

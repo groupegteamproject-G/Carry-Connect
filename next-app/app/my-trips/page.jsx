@@ -16,7 +16,7 @@ export default function MyTripsPage() {
       try {
         const { getCurrentUser } = await import("../../lib/auth");
         const currentUser = await getCurrentUser();
-        
+
         if (!currentUser) {
           alert("Please login first!");
           router.push("/auth");
@@ -25,7 +25,7 @@ export default function MyTripsPage() {
 
         setUser(currentUser);
 
-        const { getUserTrips } = await import("../../lib/firestore");
+        const { getUserTrips } = await import("../../lib/db");
         const userTrips = await getUserTrips(currentUser.uid);
         setTrips(userTrips);
       } catch (error) {
@@ -42,7 +42,7 @@ export default function MyTripsPage() {
     if (!confirm("Are you sure you want to delete this trip?")) return;
 
     try {
-      const { deleteTrip } = await import("../../lib/firestore");
+      const { deleteTrip } = await import("../../lib/db");
       await deleteTrip(tripId);
       setTrips(trips.filter(trip => trip.id !== tripId));
       alert("Trip deleted successfully!");
@@ -119,7 +119,7 @@ export default function MyTripsPage() {
               )}
 
               <div className={styles.actions}>
-                <button 
+                <button
                   onClick={() => handleDelete(trip.id)}
                   className={styles.deleteBtn}
                 >
