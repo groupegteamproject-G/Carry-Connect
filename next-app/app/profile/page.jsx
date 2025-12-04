@@ -1,21 +1,118 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import styles from "./profile.module.css";
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("trips");
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const [fullName, setFullName] = useState("Saidali");
-  const [email, setEmail] = useState("saidali@example.com");
-  const [phone, setPhone] = useState("+48 123-456-789");
-  const [location, setLocation] = useState("Lodz, Poland");
-  const [bio, setBio] = useState(
-    "Frequent traveler between US and Europe for business. Happy to help deliver packages on my regular routes!"
-  );
+  // Form State
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [location, setLocation] = useState("");
+  const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
 
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(true);
+
+  useEffect(() => {
+    let unsubscribeAuth;
+
+    async function init() {
+      try {
+        const { onAuthChange } = await import("../../lib/auth");
+        const { getUserProfile } = await import("../../lib/db");
+
+        unsubscribeAuth = onAuthChange(async (currentUser) => {
+          if (!currentUser) {
+            router.push("/auth");
+            return;
+          }
+
+          setUser(currentUser);
+          setEmail(currentUser.email);
+          setFullName(currentUser.displayName || "");
+
+          // Fetch additional profile data from Firestore
+          const profile = await getUserProfile(currentUser.uid);
+          if (profile) {
+            setFullName(profile.name || currentUser.displayName || "");
+            setPhone(profile.phone || "");
+            setLocation(profile.location || "");
+            setBio(profile.bio || "");
+            setAvatarUrl(profile.avatarUrl || "");
+            if (profile.emailNotifications !== undefined) setEmailNotifications(profile.emailNotifications);
+            if (profile.smsNotifications !== undefined) setSmsNotifications(profile.smsNotifications);
+          }
+          setLoading(false);
+        });
+      } catch (error) {
+        console.error("Error initializing profile:", error);
+        setLoading(false);
+      }
+    }
+
+    init();
+    return () => {
+      if (unsubscribeAuth) unsubscribeAuth();
+    };
+  }, [router]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSuccessMsg("");
+    setErrorMsg("");
+    try {
+      const { setUserProfile } = await import("../../lib/db");
+      await setUserProfile(user.uid, {
+        name: fullName,
+        phone,
+        location,
+        bio,
+        avatarUrl,
+        emailNotifications,
+        smsNotifications
+      });
+      setSuccessMsg("Profile updated successfully!");
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (error) {
+      console.error("Error saving profile:", error);
+      setErrorMsg("Failed to save profile.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      const { logOut } = await import("../../lib/auth");
+      await logOut();
+      router.push("/");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
+      // In a real app, we would call a cloud function to delete auth + data
+      // For MVP, we'll just sign out and maybe flag the user.
+      alert("Account deletion request received. Please contact support for immediate removal.");
+    }
+  };
+
+  if (loading) {
+    return <div style={{ padding: "50px", textAlign: "center" }}>Loading profile...</div>;
+  }
 
   return (
     <main className={styles.page}>
@@ -26,63 +123,90 @@ export default function ProfilePage() {
       <div className={styles.profileCard}>
         <div className={styles.topSection}>
           {/* Left: avatar */}
-          <div className={styles.avatar}></div>
+          <div
+            className={styles.avatar}
+            style={{
+              backgroundImage: avatarUrl ? `url(${avatarUrl})` : 'none',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center'
+            }}
+          >
+            {!avatarUrl && <i className="fa-solid fa-user" style={{ fontSize: '40px', color: '#999', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}></i>}
+          </div>
 
           {/* Middle: user info */}
           <div className={styles.userInfo}>
-            <h2 className={styles.name}>Alex Johnson</h2>
+            <h2 className={styles.name}>{fullName || "User"}</h2>
 
             <div className={styles.ratingRow}>
               <i className="fa-solid fa-star"></i>
               <i className="fa-solid fa-star"></i>
               <i className="fa-solid fa-star"></i>
               <i className="fa-solid fa-star"></i>
-              <i className="fa-regular fa-star"></i>
+              <i className="fa-solid fa-star-half-stroke"></i>
 
-              <span className={styles.ratingText}>4.8 (24 reviews)</span>
+              <span className={styles.ratingText}>No ratings yet</span>
 
               <span className={styles.verified}>
-                <i className="fa-solid fa-circle-check"></i> Verified
+                {user?.emailVerified ? (
+                  <>
+                    <i className="fa-solid fa-circle-check"></i> Verified
+                  </>
+                ) : (
+                  <>
+                    <i className="fa-regular fa-circle"></i> Unverified
+                  </>
+                )}
               </span>
             </div>
 
-            <p className={styles.joined}>Member since March 2020</p>
+            <p className={styles.joined}>Member since {user?.metadata?.creationTime ? new Date(user.metadata.creationTime).toLocaleDateString() : "Recently"}</p>
 
             <p className={styles.bio}>
-              Frequent traveler between US and Europe for business. Happy to
-              help deliver packages on my regular routes!
+              {bio || "No bio yet. Click 'Edit Profile' to add one!"}
             </p>
           </div>
 
           {/* Right: Edit profile button */}
-          <button className={styles.editBtn}>
+          <button
+            className={styles.editBtn}
+            onClick={() => {
+              setActiveTab("settings");
+              setTimeout(() => {
+                const settingsSection = document.getElementById("settings-section");
+                if (settingsSection) {
+                  settingsSection.scrollIntoView({ behavior: "smooth" });
+                }
+              }, 100);
+            }}
+          >
             <i className="fa-solid fa-gear"></i> Edit Profile
           </button>
         </div>
 
-        {/* Stats grid */}
+        {/* Stats grid (Placeholder for now, but dynamic in spirit) */}
         <div className={styles.statsGrid}>
           <div className={styles.statBox}>
             <i className="fa-solid fa-plane-departure"></i>
-            <h3>18</h3>
+            <h3>0</h3>
             <p>Completed Trips</p>
           </div>
 
           <div className={styles.statBoxGreen}>
             <i className="fa-solid fa-box"></i>
-            <h3>36</h3>
+            <h3>0</h3>
             <p>Packages Delivered</p>
           </div>
 
           <div className={styles.statBoxPurple}>
             <i className="fa-solid fa-location-dot"></i>
-            <h3>12</h3>
-            <p>Countries Visited</p>
+            <h3>{location ? 1 : 0}</h3>
+            <p>Locations</p>
           </div>
 
           <div className={styles.statBoxYellow}>
             <i className="fa-solid fa-wallet"></i>
-            <h3>$820</h3>
+            <h3>$0</h3>
             <p>Total Earnings</p>
           </div>
         </div>
@@ -95,7 +219,7 @@ export default function ProfilePage() {
             <i className="fa-solid fa-envelope"></i>
             <div>
               <h4>Email</h4>
-              <p>Verified</p>
+              <p>{user?.emailVerified ? "Verified" : "Pending"}</p>
             </div>
           </div>
 
@@ -103,7 +227,7 @@ export default function ProfilePage() {
             <i className="fa-solid fa-phone"></i>
             <div>
               <h4>Phone Number</h4>
-              <p>Verified</p>
+              <p>{phone ? "Verified" : "Add Phone"}</p>
             </div>
           </div>
 
@@ -111,15 +235,7 @@ export default function ProfilePage() {
             <i className="fa-solid fa-id-card"></i>
             <div>
               <h4>ID Verification</h4>
-              <p>Verified</p>
-            </div>
-          </div>
-
-          <div className={styles.verifyBox}>
-            <i className="fa-solid fa-house"></i>
-            <div>
-              <h4>Address</h4>
-              <p>Verified</p>
+              <p>Unverified</p>
             </div>
           </div>
         </div>
@@ -150,173 +266,37 @@ export default function ProfilePage() {
 
         {/* ---------------------- TRIPS TAB ---------------------- */}
         {activeTab === "trips" && (
-          <>
-            <h2 className={styles.sectionTitle}>Upcoming Trips</h2>
-            <div className={styles.tripGrid}>
-              <div className={styles.tripCard}>
-                <div className={styles.tripHeader}>
-                  <i className="fa-solid fa-plane"></i>
-                  <span className={styles.statusUpcoming}>Upcoming</span>
-                </div>
-
-                <div className={styles.tripInfo}>
-                  <p>
-                    <i className="fa-regular fa-circle-dot"></i> New York, USA →
-                    London, UK
-                  </p>
-                  <p>
-                    <i className="fa-regular fa-calendar"></i> Aug 15, 2023
-                  </p>
-                  <p>
-                    <i className="fa-solid fa-box"></i> Small package (2kg)
-                  </p>
-                </div>
-
-                <button className={styles.detailsBtn}>View Details</button>
-              </div>
-
-              <div className={styles.tripCard}>
-                <div className={styles.tripHeader}>
-                  <i className="fa-solid fa-plane"></i>
-                  <span className={styles.statusUpcoming}>Upcoming</span>
-                </div>
-
-                <div className={styles.tripInfo}>
-                  <p>
-                    <i className="fa-regular fa-circle-dot"></i> London, UK →
-                    New York, USA
-                  </p>
-                  <p>
-                    <i className="fa-regular fa-calendar"></i> Aug 25, 2023
-                  </p>
-                  <p>
-                    <i className="fa-solid fa-box"></i> Medium package (4kg)
-                  </p>
-                </div>
-
-                <button className={styles.detailsBtn}>View Details</button>
-              </div>
-            </div>
-
-            {/* PAST TRIPS */}
-            <h2 className={styles.sectionTitle}>Past Trips</h2>
-            <div className={styles.tripGrid}>
-              <div className={styles.tripCard}>
-                <div className={styles.tripHeader}>
-                  <i className="fa-solid fa-plane"></i>
-                  <span className={styles.statusCompleted}>Completed</span>
-                </div>
-
-                <div className={styles.tripInfo}>
-                  <p>
-                    <i className="fa-regular fa-circle-dot"></i> New York, USA →
-                    Paris, France
-                  </p>
-                  <p>
-                    <i className="fa-regular fa-calendar"></i> Jun 10, 2023
-                  </p>
-                </div>
-
-                <button className={styles.detailsBtn}>View Details</button>
-              </div>
-
-              <div className={styles.tripCard}>
-                <div className={styles.tripHeader}>
-                  <i className="fa-solid fa-plane"></i>
-                  <span className={styles.statusCompleted}>Completed</span>
-                </div>
-
-                <div className={styles.tripInfo}>
-                  <p>
-                    <i className="fa-regular fa-circle-dot"></i> Paris, France →
-                    New York, USA
-                  </p>
-                  <p>
-                    <i className="fa-regular fa-calendar"></i> Jun 20, 2023
-                  </p>
-                </div>
-
-                <button className={styles.detailsBtn}>View Details</button>
-              </div>
-
-              <div className={styles.tripCard}>
-                <div className={styles.tripHeader}>
-                  <i className="fa-solid fa-plane"></i>
-                  <span className={styles.statusCompleted}>Completed</span>
-                </div>
-
-                <div className={styles.tripInfo}>
-                  <p>
-                    <i className="fa-regular fa-circle-dot"></i> New York, USA →
-                    Berlin, Germany
-                  </p>
-                  <p>
-                    <i className="fa-regular fa-calendar"></i> May 5, 2023
-                  </p>
-                </div>
-
-                <button className={styles.detailsBtn}>View Details</button>
-              </div>
-            </div>
-          </>
+          <div style={{ padding: "20px 0", color: "#666" }}>
+            <p>No trips history available yet.</p>
+          </div>
         )}
 
         {/* ---------------------- REVIEWS TAB ---------------------- */}
         {activeTab === "reviews" && (
-          <div className={styles.reviewsSection}>
-            <h2 className={styles.sectionTitle}>Reviews (2)</h2>
-
-            {/* Review 1 */}
-            <div className={styles.reviewCard}>
-              <div className={styles.reviewHeader}>
-                <h4>Sarah M.</h4>
-                <span className={styles.reviewDate}>July 15, 2023</span>
-              </div>
-
-              <div className={styles.reviewStars}>
-                <i className="fa-solid fa-star"></i>
-                <i className="fa-solid fa-star"></i>
-                <i className="fa-solid fa-star"></i>
-                <i className="fa-solid fa-star"></i>
-                <i className="fa-regular fa-star"></i>
-              </div>
-
-              <p className={styles.reviewText}>
-                Alex delivered my package on time and in perfect condition.
-                Great communication throughout!
-              </p>
-            </div>
-
-            {/* Review 2 */}
-            <div className={styles.reviewCard}>
-              <div className={styles.reviewHeader}>
-                <h4>James P.</h4>
-                <span className={styles.reviewDate}>June 3, 2023</span>
-              </div>
-
-              <div className={styles.reviewStars}>
-                <i className="fa-solid fa-star"></i>
-                <i className="fa-solid fa-star"></i>
-                <i className="fa-solid fa-star"></i>
-                <i className="fa-regular fa-star"></i>
-                <i className="fa-regular fa-star"></i>
-              </div>
-
-              <p className={styles.reviewText}>
-                Reliable carrier, took good care of my package. Would use again.
-              </p>
-            </div>
+          <div style={{ padding: "20px 0", color: "#666" }}>
+            <p>No reviews yet.</p>
           </div>
         )}
 
         {/* ---------------------- SETTINGS TAB ---------------------- */}
         {activeTab === "settings" && (
-          <div className={styles.settingsWrapper}>
+          <div className={styles.settingsWrapper} id="settings-section">
             <div className={styles.settingsCard}>
               <h2 className={styles.settingsTitle}>Account Settings</h2>
 
               {/* PERSONAL INFORMATION */}
               <h4 className={styles.settingsSubtitle}>Personal Information</h4>
+
+              {successMsg && (
+                <div style={{ padding: "10px", background: "#d4edda", color: "#155724", borderRadius: "5px", marginBottom: "15px" }}>
+                  {successMsg}
+                </div>
+              )}
+              {errorMsg && (
+                <div style={{ padding: "10px", background: "#f8d7da", color: "#721c24", borderRadius: "5px", marginBottom: "15px" }}>
+                  {errorMsg}
+                </div>
+              )}
 
               <div className={styles.settingsGrid}>
                 {/* FULL NAME */}
@@ -335,7 +315,8 @@ export default function ProfilePage() {
                   <input
                     className={styles.inputField}
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    disabled
+                    style={{ opacity: 0.7, cursor: 'not-allowed' }}
                   />
                 </div>
 
@@ -346,6 +327,7 @@ export default function ProfilePage() {
                     className={styles.inputField}
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+1 234 567 890"
                   />
                 </div>
 
@@ -356,6 +338,18 @@ export default function ProfilePage() {
                     className={styles.inputField}
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
+                    placeholder="City, Country"
+                  />
+                </div>
+
+                {/* AVATAR URL */}
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label>Avatar URL (Image Link)</label>
+                  <input
+                    className={styles.inputField}
+                    value={avatarUrl}
+                    onChange={(e) => setAvatarUrl(e.target.value)}
+                    placeholder="https://example.com/my-photo.jpg"
                   />
                 </div>
               </div>
@@ -367,6 +361,7 @@ export default function ProfilePage() {
                   className={styles.textareaField}
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
+                  placeholder="Tell us a bit about yourself..."
                 />
               </div>
 
@@ -403,14 +398,24 @@ export default function ProfilePage() {
 
               {/* SAVE BUTTON */}
               <div className={styles.saveRow}>
-                <button className={styles.saveBtn}>Save Changes</button>
+                <button
+                  className={styles.saveBtn}
+                  onClick={handleSave}
+                  disabled={saving}
+                >
+                  {saving ? "Saving..." : "Save Changes"}
+                </button>
               </div>
 
               {/* DANGER ZONE */}
               <div className={styles.dangerZone}>
                 <h3>Danger Zone</h3>
-                <button className={styles.logoutBtn}>
-                  <i className="fa-solid fa-right-from-bracket"></i> Log Out
+                <button
+                  className={styles.logoutBtn}
+                  onClick={handleDeleteAccount}
+                  style={{ background: '#ff000011', borderColor: '#ff000033' }}
+                >
+                  <i className="fa-solid fa-trash"></i> Delete Account
                 </button>
               </div>
             </div>

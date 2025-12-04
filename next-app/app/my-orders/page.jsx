@@ -1,0 +1,109 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import styles from "./my-orders.module.css";
+
+export default function MyOrdersPage() {
+    const router = useRouter();
+    const [orders, setOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let unsubscribe;
+
+        async function init() {
+            try {
+                const { onAuthChange } = await import("../../lib/auth");
+                const { listenToMyBookings } = await import("../../lib/db");
+
+                onAuthChange((user) => {
+                    if (!user) {
+                        router.push("/auth");
+                        return;
+                    }
+
+                    unsubscribe = listenToMyBookings((bookings) => {
+                        setOrders(bookings);
+                        setLoading(false);
+                    });
+                });
+            } catch (error) {
+                console.error("Error initializing orders:", error);
+                setLoading(false);
+            }
+        }
+
+        init();
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, [router]);
+
+    if (loading) {
+        return <div style={{ padding: "50px", textAlign: "center" }}>Loading your orders...</div>;
+    }
+
+    return (
+        <main className={styles.page}>
+            <div className={styles.headerBg}></div>
+
+            <div className={styles.container}>
+                <h1 className={styles.pageTitle}>My Orders</h1>
+
+                {orders.length === 0 ? (
+                    <div className={styles.emptyState}>
+                        <i className="fa-solid fa-box-open"></i>
+                        <h3>No orders yet</h3>
+                        <p>You haven't booked any trips yet. Find a carrier to send your package!</p>
+                        <button className={styles.browseBtn} onClick={() => router.push("/find-a-carrier")}>
+                            Find a Carrier
+                        </button>
+                    </div>
+                ) : (
+                    <div className={styles.ordersGrid}>
+                        {orders.map((order) => (
+                            <div key={order.id} className={styles.orderCard}>
+                                <div className={styles.orderInfo}>
+                                    <h3>{order.description || "Package Delivery"}</h3>
+
+                                    <div className={styles.route}>
+                                        <span>{order.from}</span>
+                                        <i className="fa-solid fa-arrow-right arrow"></i>
+                                        <span>{order.to}</span>
+                                    </div>
+
+                                    <div className={styles.meta}>
+                                        <span>
+                                            <i className="fa-regular fa-calendar"></i>
+                                            {order.date?.toDate ? order.date.toDate().toLocaleDateString() : new Date(order.date).toLocaleDateString()}
+                                        </span>
+                                        <span>
+                                            <i className="fa-solid fa-weight-hanging"></i>
+                                            {order.packageSize}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className={styles.actions}>
+                                    <span className={`${styles.status} ${order.status === 'accepted' ? styles.statusAccepted :
+                                            order.status === 'rejected' ? styles.statusRejected :
+                                                styles.statusPending
+                                        }`}>
+                                        {order.status || "Pending"}
+                                    </span>
+
+                                    <span className={styles.price}>${order.price}</span>
+
+                                    <button className={styles.detailsBtn}>
+                                        View Details
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </main>
+    );
+}

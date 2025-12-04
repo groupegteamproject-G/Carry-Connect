@@ -46,7 +46,18 @@ export default function AuthPage() {
         router.push(redirectUrl);
       }
     } catch (err) {
-      setError(err.message || "An error occurred");
+      console.error("Auth error:", err);
+      let message = "An error occurred. Please try again.";
+      if (err.message.includes("auth/invalid-credential") || err.message.includes("auth/user-not-found") || err.message.includes("auth/wrong-password")) {
+        message = "Wrong email or password.";
+      } else if (err.message.includes("auth/email-already-in-use")) {
+        message = "This email is already registered.";
+      } else if (err.message.includes("auth/weak-password")) {
+        message = "Password should be at least 6 characters.";
+      } else if (err.message.includes("auth/invalid-email")) {
+        message = "Please enter a valid email address.";
+      }
+      setError(message);
       setLoading(false);
     }
   };

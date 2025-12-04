@@ -54,7 +54,12 @@ export default function Navbar() {
       <div className="navbar-center">
         <Link href="/find-a-carrier">Find a Carrier</Link>
         <Link href="/add-trip">Add Trip</Link>
-        {user && <Link href="/my-trips">My Trips</Link>}
+        {user && (
+          <>
+            <Link href="/my-trips">My Trips</Link>
+            <Link href="/my-orders">My Orders</Link>
+          </>
+        )}
       </div>
 
       {/* RIGHT ICONS */}
