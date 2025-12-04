@@ -52,8 +52,8 @@ export default function Navbar() {
 
       {/* CENTER LINKS */}
       <div className="navbar-center">
-
         <Link href="/find-a-carrier">Find a Carrier</Link>
+        <Link href="/add-trip">Add Trip</Link>
         {user && <Link href="/my-trips">My Trips</Link>}
       </div>
 
@@ -67,10 +67,6 @@ export default function Navbar() {
 
             <Link href="/profile" className="icon">
               <i className="fa-regular fa-user"></i>
-            </Link>
-
-            <Link href="/add-trip" className="add-trip-btn">
-              Add Trip
             </Link>
 
             <button

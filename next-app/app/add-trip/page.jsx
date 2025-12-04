@@ -25,14 +25,14 @@ export default function AddTripPage() {
         const { getCurrentUser } = await import("../../lib/auth");
         const currentUser = await getCurrentUser();
         if (!currentUser) {
-          alert("Please login first!");
-          router.push("/auth");
+          // Redirect to auth with return URL
+          router.push("/auth?redirect=/add-trip");
         } else {
           setUser(currentUser);
         }
       } catch (error) {
         console.error("Auth error:", error);
-        router.push("/auth");
+        router.push("/auth?redirect=/add-trip");
       }
     }
     checkAuth();

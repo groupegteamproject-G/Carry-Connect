@@ -38,16 +38,15 @@ export default function AuthPage() {
 
       if (isLogin) {
         await signIn(formData.email, formData.password);
-        setSuccessMsg("Login successful! Redirecting...");
-        setTimeout(() => router.push(redirectUrl), 1500);
+        setSuccessMsg("Login successful!");
+        router.push(redirectUrl);
       } else {
         await signUp(formData.email, formData.password, formData.name, formData.phone);
-        setSuccessMsg("Account created successfully! Redirecting...");
-        setTimeout(() => router.push(redirectUrl), 1500);
+        setSuccessMsg("Account created successfully!");
+        router.push(redirectUrl);
       }
     } catch (err) {
       setError(err.message || "An error occurred");
-    } finally {
       setLoading(false);
     }
   };
