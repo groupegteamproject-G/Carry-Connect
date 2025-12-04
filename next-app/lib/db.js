@@ -104,6 +104,19 @@ export const getUserOrders = async (userId) => {
   }
 };
 
+export const getUserReviews = async (userId) => {
+  try {
+    // Assuming reviews are stored in a subcollection or separate collection. 
+    // For now, let's assume a 'reviews' collection where 'targetUid' is the user being reviewed.
+    const q = query(collection(db, "reviews"), where("targetUid", "==", userId), orderBy("createdAt", "desc"));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate() }));
+  } catch (error) {
+    console.error("Error getting user reviews:", error);
+    return [];
+  }
+};
+
 // Trip Management (Carriers)
 
 // Post a trip (Carrier)

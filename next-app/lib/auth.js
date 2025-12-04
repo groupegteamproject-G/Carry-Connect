@@ -130,3 +130,12 @@ export const sendEmailVerification = async (user) => {
     throw error;
   }
 };
+
+// Delete user account
+export const deleteUserAccount = async (user) => {
+  try {
+    await user.delete();
+  } catch (error) {
+    throw error;
+  }
+};

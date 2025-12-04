@@ -55,7 +55,10 @@ export default function ProfilePage() {
             photoURL: currentUser.photoURL || ""
           };
 
-          setUser(userData);
+          setUser({
+            ...userData,
+            providerData: currentUser.providerData
+          });
           setFormData({
             name: userData.name || "",
             email: userData.email || "",
@@ -198,11 +201,52 @@ export default function ProfilePage() {
     }
   };
 
+  const handleVerifyEmail = async () => {
+    try {
+      const { sendEmailVerification } = await import("../../lib/auth");
+      // We need the current auth user object, not just our state user
+      const { auth } = await import("../../lib/firebase");
+      if (auth.currentUser) {
+        await sendEmailVerification(auth.currentUser);
+        alert(`Verification email sent to ${user.email}. Please check your inbox.`);
+      }
+    } catch (error) {
+      console.error("Error sending verification email:", error);
+      alert("Failed to send verification email. Try again later.");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      const { deleteUserAccount } = await import("../../lib/auth");
+      const { auth } = await import("../../lib/firebase");
+
+      if (auth.currentUser) {
+        await deleteUserAccount(auth.currentUser);
+        alert("Account deleted successfully.");
+        router.push("/");
+      }
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      if (error.code === 'auth/requires-recent-login') {
+        alert("For security, please log out and log in again before deleting your account.");
+      } else {
+        alert("Failed to delete account.");
+      }
+    }
+  };
+
   if (loading) {
     return <div className={styles.loading}>Loading profile...</div>;
   }
 
   if (!user) return null;
+
+  const isGoogleAuth = user.providerData?.some(p => p.providerId === 'google.com');
 
   return (
     <main className={styles.container}>
@@ -223,6 +267,13 @@ export default function ProfilePage() {
           <h1>{user.name || "User"}</h1>
           <p>{user.email}</p>
           <div className={styles.badges}>
+            {user.emailVerified || isGoogleAuth ? (
+              <span className={styles.verifiedBadge}><i className="fa-solid fa-check"></i> Email Verified</span>
+            ) : (
+              <button onClick={handleVerifyEmail} className={styles.unverifiedBadge} title="Click to verify email">
+                Email Pending (Verify)
+              </button>
+            )}
             {phoneVerified ? (
               <span className={styles.verifiedBadge}><i className="fa-solid fa-check"></i> Phone Verified</span>
             ) : (
@@ -231,6 +282,30 @@ export default function ProfilePage() {
           </div>
         </div>
         <button onClick={handleLogout} className={styles.logoutBtn}>Log Out</button>
+      </div>
+
+      {/* Stats Section */}
+      <div className={styles.statsGrid}>
+        <div className={styles.statBox}>
+          <i className="fa-solid fa-plane"></i>
+          <h3>{myTrips.length}</h3>
+          <p>Trips Posted</p>
+        </div>
+        <div className={styles.statBoxGreen}>
+          <i className="fa-solid fa-box"></i>
+          <h3>{myOrders.length}</h3>
+          <p>Orders Made</p>
+        </div>
+        <div className={styles.statBoxYellow}>
+          <i className="fa-solid fa-star"></i>
+          <h3>5.0</h3>
+          <p>Rating</p>
+        </div>
+        <div className={styles.statBoxPurple}>
+          <i className="fa-solid fa-calendar"></i>
+          <h3>{new Date(user.createdAt?.seconds * 1000).getFullYear() || 2024}</h3>
+          <p>Member Since</p>
+        </div>
       </div>
 
       <div className={styles.tabs}>
@@ -245,6 +320,12 @@ export default function ProfilePage() {
           onClick={() => setActiveTab('orders')}
         >
           My Orders
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'reviews' ? styles.active : ''}`}
+          onClick={() => setActiveTab('reviews')}
+        >
+          Reviews
         </button>
         <button
           className={`${styles.tab} ${activeTab === 'settings' ? styles.active : ''}`}
@@ -283,6 +364,12 @@ export default function ProfilePage() {
                 </div>
               ))
             )}
+          </div>
+        )}
+
+        {activeTab === 'reviews' && (
+          <div className={styles.reviewsSection}>
+            <p>No reviews yet.</p>
           </div>
         )}
 
@@ -336,6 +423,14 @@ export default function ProfilePage() {
 
               <button type="submit" className={styles.saveBtn}>Save Changes</button>
             </form>
+
+            <div className={styles.dangerZone}>
+              <h3>Danger Zone</h3>
+              <p>Once you delete your account, there is no going back. Please be certain.</p>
+              <button onClick={handleDeleteAccount} className={styles.deleteBtn}>
+                <i className="fa-solid fa-trash"></i> Delete Account
+              </button>
+            </div>
           </div>
         )}
       </div>

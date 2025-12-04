@@ -98,6 +98,8 @@
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
+  border: none;
+  cursor: pointer;
 }
 
 .logoutBtn {
@@ -370,4 +372,42 @@
 .loadingSpinner {
   color: #666;
   font-size: 14px;
+}
+
+/* Danger Zone */
+.dangerZone {
+  margin-top: 40px;
+  padding-top: 30px;
+  border-top: 1px solid #ffe3e3;
+}
+
+.dangerZone h3 {
+  color: #dc3545;
+  font-size: 18px;
+  margin: 0 0 10px 0;
+}
+
+.dangerZone p {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 15px;
+}
+
+.deleteBtn {
+  background: #fff;
+  color: #dc3545;
+  border: 1px solid #dc3545;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.deleteBtn:hover {
+  background: #dc3545;
+  color: white;
 }
