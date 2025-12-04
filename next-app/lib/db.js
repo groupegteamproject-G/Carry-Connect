@@ -11,7 +11,8 @@ import {
   where,
   serverTimestamp,
   deleteDoc,
-  Timestamp
+  Timestamp,
+  runTransaction
 } from "firebase/firestore";
 import {
   createUserWithEmailAndPassword,
@@ -92,10 +93,30 @@ export const postTrip = async ({ from, to, date, transportType, packageSize, pri
   }
 };
 
+// Get single trip (for Booking page)
+export const getTrip = async (tripId) => {
+  try {
+    const docRef = doc(db, "trips", tripId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        ...data,
+        date: data.date?.toDate ? data.date.toDate() : new Date(data.date)
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting trip:", error);
+    return null;
+  }
+};
+
 // Get all available carriers/trips (Find Carrier page)
 export const listenToAvailableTrips = (callback) => {
   console.log("listenToAvailableTrips: Setting up listener...");
-  const q = query(collection(db, "trips"), where("status", "==", "available"), orderBy("createdAt", "desc"));
+  const q = query(collection(db, "trips"), where("status", "==", "available"));
   return onSnapshot(q, (snap) => {
     console.log("listenToAvailableTrips: Snapshot received, docs:", snap.docs.length);
     const trips = snap.docs.map(d => ({ id: d.id, ...d.data(), date: d.data().date?.toDate ? d.data().date.toDate() : new Date(d.data().date) }));
@@ -156,24 +177,71 @@ export async function getCarriers(filters = {}) {
 
 // Book a trip
 export const bookTrip = async (tripId, { weight, pickupLocation, dropoffLocation, reward }) => {
-  if (!auth.currentUser) throw new Error("Login required");
-  const tripRef = doc(db, "trips", tripId);
-  const tripSnap = await getDoc(tripRef);
-  if (!tripSnap.exists()) throw new Error("Trip not found");
+  // Ensure auth is ready
+  let user = auth.currentUser;
+  if (!user) {
+    user = await new Promise(resolve => {
+      const timeout = setTimeout(() => {
+        unsubscribe();
+        resolve(null);
+      }, 4000);
 
-  const trip = tripSnap.data();
-  if (trip.status !== "available") throw new Error("Trip no longer available");
+      const unsubscribe = onAuthChange((u) => {
+        if (u) {
+          clearTimeout(timeout);
+          unsubscribe();
+          resolve(u);
+        }
+      });
+    });
+  }
 
-  await updateDoc(tripRef, {
-    status: "booked",
-    bookedByUid: auth.currentUser.uid,
-    bookedByEmail: auth.currentUser.email,
-    weight: Number(weight),
-    pickupLocation,
-    dropoffLocation,
-    reward: Number(reward),
-    bookedAt: serverTimestamp()
-  });
+  if (!user) {
+    console.error("bookTrip: User is not authenticated.");
+    throw new Error("Login required");
+  }
+
+  console.log("bookTrip: Proceeding with user:", user.uid);
+  const tripRef = doc(db, "trips", tripId); // Restore tripRef definition
+  console.log("bookTrip: tripRef path:", tripRef.path);
+
+  try {
+    await runTransaction(db, async (transaction) => {
+      console.log("bookTrip: Transaction started");
+
+      // Force token refresh inside transaction context (optional but good)
+      // await user.getIdToken(true); 
+
+      const tripDoc = await transaction.get(tripRef);
+      console.log("bookTrip: Trip doc exists?", tripDoc.exists());
+
+      if (!tripDoc.exists()) throw new Error("Trip not found");
+
+      const tripData = tripDoc.data();
+      console.log("bookTrip: Trip status:", tripData.status);
+
+      if (tripData.status !== "available") throw new Error("Trip no longer available");
+
+      console.log("bookTrip: Attempting update...");
+      transaction.update(tripRef, {
+        status: "booked",
+        bookedByUid: user.uid,
+        bookedByEmail: user.email,
+        weight: Number(weight),
+        pickupLocation,
+        dropoffLocation,
+        reward: Number(reward),
+        bookedAt: serverTimestamp()
+      });
+      console.log("bookTrip: Update queued");
+    });
+    console.log("bookTrip: Transaction committed successfully");
+  } catch (e) {
+    console.error("bookTrip: Transaction failed:", e);
+    console.error("bookTrip: Error code:", e.code);
+    console.error("bookTrip: Error message:", e.message);
+    throw e;
+  }
 };
 
 // Listen to my bookings

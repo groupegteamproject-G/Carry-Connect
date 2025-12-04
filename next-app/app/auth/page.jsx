@@ -33,15 +33,17 @@ export default function AuthPage() {
 
     try {
       const { signIn, signUp } = await import("../../lib/auth");
+      const searchParams = new URLSearchParams(window.location.search);
+      const redirectUrl = searchParams.get("redirect") || "/";
 
       if (isLogin) {
         await signIn(formData.email, formData.password);
         setSuccessMsg("Login successful! Redirecting...");
-        setTimeout(() => router.push("/"), 1500);
+        setTimeout(() => router.push(redirectUrl), 1500);
       } else {
         await signUp(formData.email, formData.password, formData.name, formData.phone);
         setSuccessMsg("Account created successfully! Redirecting...");
-        setTimeout(() => router.push("/"), 1500);
+        setTimeout(() => router.push(redirectUrl), 1500);
       }
     } catch (err) {
       setError(err.message || "An error occurred");

@@ -10,11 +10,11 @@ service cloud.firestore {
     }
 
     match /trips/{tripId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn() && (
         isOwner(resource.data.carrierUid) ||
-        (resource.data.bookedByUid != null && isOwner(resource.data.bookedByUid))
+        (resource.data.status == "available" && request.resource.data.status == "booked")
       );
       allow delete: if isSignedIn() && isOwner(resource.data.carrierUid);
 

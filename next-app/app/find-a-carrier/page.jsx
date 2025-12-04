@@ -126,7 +126,7 @@ export default function FindCarrierPage() {
                       Your Trip
                     </button>
                   ) : (
-                    <Link href={`/booking/${carrier.id}`} className={styles.bookBtn}>
+                    <Link href={`/booking?tripId=${carrier.id}`} className={styles.bookBtn}>
                       Book Now
                     </Link>
                   )}

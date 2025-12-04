@@ -1,5 +1,5 @@
 // Authentication helper functions
-import { 
+import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
@@ -10,6 +10,12 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, Timestamp } from 'firebase/firestore';
 import { auth, db } from './firebase';
+import { setPersistence, browserLocalPersistence } from 'firebase/auth';
+
+// Ensure persistence is set
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error("Error setting persistence:", error);
+});
 
 /**
  * Sign up with email and password
@@ -18,10 +24,10 @@ export async function signUp(email, password, displayName) {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
-    
+
     // Update profile
     await updateProfile(user, { displayName });
-    
+
     // Create user document in Firestore
     await setDoc(doc(db, 'users', user.uid), {
       email: user.email,
@@ -35,7 +41,7 @@ export async function signUp(email, password, displayName) {
       rating: 0,
       reviewCount: 0
     });
-    
+
     return user;
   } catch (error) {
     console.error('Error signing up:', error);
@@ -64,7 +70,7 @@ export async function signInWithGoogle() {
     const provider = new GoogleAuthProvider();
     const userCredential = await signInWithPopup(auth, provider);
     const user = userCredential.user;
-    
+
     // Check if user document exists, if not create it
     const userDoc = doc(db, 'users', user.uid);
     await setDoc(userDoc, {
@@ -80,7 +86,7 @@ export async function signInWithGoogle() {
       rating: 0,
       reviewCount: 0
     }, { merge: true });
-    
+
     return user;
   } catch (error) {
     console.error('Error signing in with Google:', error);
