@@ -20,7 +20,8 @@ import {
   onAuthStateChanged,
   signOut
 } from "firebase/auth";
-import { db, auth } from "./firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, auth, storage } from "./firebase";
 
 // Re-export auth and db
 export { auth, db };
@@ -66,6 +67,18 @@ export async function setUserProfile(userId, profileData) {
     return false;
   }
 }
+
+export const uploadProfileImage = async (userId, file) => {
+  try {
+    const storageRef = ref(storage, `profile_images/${userId}`);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    return downloadURL;
+  } catch (error) {
+    console.error("Error uploading profile image:", error);
+    throw error;
+  }
+};
 
 export const updateUserProfile = setUserProfile; // Alias for compatibility
 

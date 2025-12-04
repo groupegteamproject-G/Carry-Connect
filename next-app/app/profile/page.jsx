@@ -176,6 +176,28 @@ export default function ProfilePage() {
     }
   };
 
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File size should be less than 5MB");
+      return;
+    }
+
+    try {
+      const { uploadProfileImage, updateUserProfile } = await import("../../lib/db");
+      const downloadURL = await uploadProfileImage(user.uid, file);
+
+      await updateUserProfile(user.uid, { photoURL: downloadURL });
+      setUser(prev => ({ ...prev, photoURL: downloadURL }));
+      alert("Profile picture updated!");
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      alert("Failed to upload image.");
+    }
+  };
+
   if (loading) {
     return <div className={styles.loading}>Loading profile...</div>;
   }
@@ -187,6 +209,15 @@ export default function ProfilePage() {
       <div className={styles.header}>
         <div className={styles.avatar}>
           {user.photoURL ? <img src={user.photoURL} alt="Profile" /> : (user.name?.[0] || "U")}
+          <label className={styles.avatarOverlay}>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              style={{ display: 'none' }}
+            />
+            <i className="fa-solid fa-camera"></i>
+          </label>
         </div>
         <div className={styles.userInfo}>
           <h1>{user.name || "User"}</h1>
