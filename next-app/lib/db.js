@@ -95,9 +95,15 @@ export const getUserTrips = async (userId) => {
 
 export const getUserOrders = async (userId) => {
   try {
-    const q = query(collection(db, "trips"), where("bookedByUid", "==", userId), orderBy("bookedAt", "desc"));
+    const q = query(collection(db, "trips"), where("bookedByUid", "==", userId));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Sort by bookedAt desc in memory
+    return orders.sort((a, b) => {
+      const dateA = a.bookedAt?.toDate ? a.bookedAt.toDate() : new Date(a.bookedAt || 0);
+      const dateB = b.bookedAt?.toDate ? b.bookedAt.toDate() : new Date(b.bookedAt || 0);
+      return dateB - dateA;
+    });
   } catch (error) {
     console.error("Error getting user orders:", error);
     return [];

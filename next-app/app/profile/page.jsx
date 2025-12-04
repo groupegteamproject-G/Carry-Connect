@@ -30,6 +30,7 @@ export default function ProfilePage() {
   // Data Lists
   const [myTrips, setMyTrips] = useState([]);
   const [myOrders, setMyOrders] = useState([]);
+  const [myReviews, setMyReviews] = useState([]);
 
   useEffect(() => {
     let unsubscribeAuth;
@@ -74,6 +75,11 @@ export default function ProfilePage() {
 
           const orders = await getUserOrders(currentUser.uid);
           setMyOrders(orders);
+
+          // Fetch Reviews
+          const { getUserReviews } = await import("../../lib/db");
+          const reviews = await getUserReviews(currentUser.uid);
+          setMyReviews(reviews);
 
           setLoading(false);
 
@@ -298,7 +304,11 @@ export default function ProfilePage() {
         </div>
         <div className={styles.statBoxYellow}>
           <i className="fa-solid fa-star"></i>
-          <h3>5.0</h3>
+          <h3>
+            {myReviews.length > 0
+              ? (myReviews.reduce((acc, r) => acc + r.rating, 0) / myReviews.length).toFixed(1)
+              : "-"}
+          </h3>
           <p>Rating</p>
         </div>
         <div className={styles.statBoxPurple}>
@@ -369,7 +379,30 @@ export default function ProfilePage() {
 
         {activeTab === 'reviews' && (
           <div className={styles.reviewsSection}>
-            <p>No reviews yet.</p>
+            {myReviews.length === 0 ? (
+              <p>No reviews yet.</p>
+            ) : (
+              myReviews.map(review => (
+                <div key={review.id} className={styles.reviewCard}>
+                  <div className={styles.reviewHeader}>
+                    <h4>{review.reviewerName || "Anonymous"}</h4>
+                    <span className={styles.reviewDate}>
+                      {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : ""}
+                    </span>
+                  </div>
+                  <div className={styles.reviewStars}>
+                    {[...Array(5)].map((_, i) => (
+                      <i
+                        key={i}
+                        className={`fa-solid fa-star ${i < review.rating ? styles.starFilled : styles.starEmpty}`}
+                        style={{ color: i < review.rating ? '#ffb400' : '#ddd' }}
+                      ></i>
+                    ))}
+                  </div>
+                  <p className={styles.reviewText}>{review.comment}</p>
+                </div>
+              ))
+            )}
           </div>
         )}
 
