@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import ConfirmationModal from "../components/ConfirmationModal";
 import styles from "./mytrips.module.css";
 
 export default function MyTripsPage() {
@@ -13,6 +14,8 @@ export default function MyTripsPage() {
 
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [tripToDelete, setTripToDelete] = useState(null);
 
   useEffect(() => {
     let unsubscribe = () => { };
@@ -44,14 +47,21 @@ export default function MyTripsPage() {
     return () => unsubscribe();
   }, [router]);
 
-  const handleDelete = async (tripId) => {
-    if (!confirm("Are you sure you want to delete this trip?")) return;
+  const handleDeleteClick = (tripId) => {
+    setTripToDelete(tripId);
+    setIsModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!tripToDelete) return;
+
     setSuccessMsg("");
     setErrorMsg("");
+    setIsModalOpen(false);
 
     try {
       const { deleteTrip } = await import("../../lib/db");
-      await deleteTrip(tripId);
+      await deleteTrip(tripToDelete);
       // setTrips is handled by the listener automatically
       setSuccessMsg("Trip deleted successfully!");
       setTimeout(() => setSuccessMsg(""), 3000);
@@ -59,6 +69,8 @@ export default function MyTripsPage() {
       console.error("Error deleting trip:", error);
       setErrorMsg("Failed to delete trip");
       setTimeout(() => setErrorMsg(""), 3000);
+    } finally {
+      setTripToDelete(null);
     }
   };
 
@@ -141,7 +153,7 @@ export default function MyTripsPage() {
 
               <div className={styles.actions}>
                 <button
-                  onClick={() => handleDelete(trip.id)}
+                  onClick={() => handleDeleteClick(trip.id)}
                   className={styles.deleteBtn}
                 >
                   Delete
@@ -151,6 +163,15 @@ export default function MyTripsPage() {
           ))}
         </div>
       )}
+
+
+      <ConfirmationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Trip"
+        message="Are you sure you want to delete this trip? This action cannot be undone."
+      />
     </div>
   );
 }

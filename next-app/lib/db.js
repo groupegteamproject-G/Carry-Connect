@@ -93,6 +93,19 @@ export const postTrip = async ({ from, to, date, transportType, packageSize, pri
   }
 };
 
+// Delete a trip
+export const deleteTrip = async (tripId) => {
+  if (!auth.currentUser) throw new Error("Login required");
+  
+  try {
+    await deleteDoc(doc(db, "trips", tripId));
+    return true;
+  } catch (error) {
+    console.error("Error deleting trip:", error);
+    throw error;
+  }
+};
+
 // Get single trip (for Booking page)
 export const getTrip = async (tripId) => {
   try {
