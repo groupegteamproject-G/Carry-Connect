@@ -98,6 +98,12 @@ export const getCurrentUser = () => {
 
 // Setup Recaptcha for phone verification
 export const setupRecaptcha = (containerId) => {
+  const container = document.getElementById(containerId);
+  if (!container) {
+    console.warn(`Recaptcha container '${containerId}' not found.`);
+    return null;
+  }
+
   if (!window.recaptchaVerifier) {
     window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
       size: "invisible",

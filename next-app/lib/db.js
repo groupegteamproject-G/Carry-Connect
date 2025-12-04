@@ -114,9 +114,15 @@ export const getUserReviews = async (userId) => {
   try {
     // Assuming reviews are stored in a subcollection or separate collection. 
     // For now, let's assume a 'reviews' collection where 'targetUid' is the user being reviewed.
-    const q = query(collection(db, "reviews"), where("targetUid", "==", userId), orderBy("createdAt", "desc"));
+    const q = query(collection(db, "reviews"), where("targetUid", "==", userId));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate() }));
+    const reviews = snap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate() }));
+    // Sort by createdAt desc in memory
+    return reviews.sort((a, b) => {
+      const dateA = a.createdAt || new Date(0);
+      const dateB = b.createdAt || new Date(0);
+      return dateB - dateA;
+    });
   } catch (error) {
     console.error("Error getting user reviews:", error);
     return [];

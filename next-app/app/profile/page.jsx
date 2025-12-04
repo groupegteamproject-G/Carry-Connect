@@ -27,6 +27,10 @@ export default function ProfilePage() {
   const [verifyError, setVerifyError] = useState("");
   const [verifySuccess, setVerifySuccess] = useState("");
 
+  // Generic Modal State
+  const [modalMessage, setModalMessage] = useState(null);
+  const [modalType, setModalType] = useState("success"); // success, error
+
   // Data Lists
   const [myTrips, setMyTrips] = useState([]);
   const [myOrders, setMyOrders] = useState([]);
@@ -110,16 +114,19 @@ export default function ProfilePage() {
     try {
       const { updateUserProfile } = await import("../../lib/db");
       await updateUserProfile(user.uid, formData);
-      alert("Profile updated successfully!");
+      setModalType("success");
+      setModalMessage("Profile updated successfully!");
     } catch (error) {
       console.error("Error updating profile:", error);
-      alert("Failed to update profile.");
+      setModalType("error");
+      setModalMessage("Failed to update profile.");
     }
   };
 
   const handleVerifyPhone = async () => {
     if (!formData.phone) {
-      alert("Please enter a phone number first.");
+      setModalType("error");
+      setModalMessage("Please enter a phone number first.");
       return;
     }
 
@@ -129,7 +136,12 @@ export default function ProfilePage() {
 
     try {
       const { linkPhoneNumber, setupRecaptcha } = await import("../../lib/auth");
+      const { auth } = await import("../../lib/firebase"); // Import auth instance
+
       const appVerifier = setupRecaptcha("recaptcha-container");
+      if (!appVerifier) {
+        throw new Error("Recaptcha not initialized");
+      }
 
       // Format phone number if needed (basic check)
       let phoneToVerify = formData.phone;
@@ -139,7 +151,11 @@ export default function ProfilePage() {
         // Better to let Firebase handle validation or show error
       }
 
-      const confirmationResult = await linkPhoneNumber(user, phoneToVerify, appVerifier);
+      if (!auth.currentUser) {
+        throw new Error("User not authenticated");
+      }
+
+      const confirmationResult = await linkPhoneNumber(auth.currentUser, phoneToVerify, appVerifier);
       setVerificationId(confirmationResult);
       setVerifySuccess("Code sent! Please check your SMS.");
     } catch (error) {
@@ -168,7 +184,9 @@ export default function ProfilePage() {
       setPhoneVerified(true);
       setIsVerifyingPhone(false);
       setVerifySuccess("Phone verified successfully!");
-      alert("Phone verified!");
+
+      setModalType("success");
+      setModalMessage("Phone verified successfully!");
     } catch (error) {
       console.error("Error confirming code:", error);
       setVerifyError("Invalid code. Please try again.");
@@ -190,7 +208,8 @@ export default function ProfilePage() {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      alert("File size should be less than 5MB");
+      setModalType("error");
+      setModalMessage("File size should be less than 5MB");
       return;
     }
 
@@ -200,10 +219,12 @@ export default function ProfilePage() {
 
       await updateUserProfile(user.uid, { photoURL: downloadURL });
       setUser(prev => ({ ...prev, photoURL: downloadURL }));
-      alert("Profile picture updated!");
+      setModalType("success");
+      setModalMessage("Profile picture updated!");
     } catch (error) {
       console.error("Error uploading image:", error);
-      alert("Failed to upload image.");
+      setModalType("error");
+      setModalMessage("Failed to upload image.");
     }
   };
 
@@ -214,11 +235,13 @@ export default function ProfilePage() {
       const { auth } = await import("../../lib/firebase");
       if (auth.currentUser) {
         await sendEmailVerification(auth.currentUser);
-        alert(`Verification email sent to ${user.email}. Please check your inbox.`);
+        setModalType("success");
+        setModalMessage(`Verification email sent to ${user.email}. Please check your inbox.`);
       }
     } catch (error) {
       console.error("Error sending verification email:", error);
-      alert("Failed to send verification email. Try again later.");
+      setModalType("error");
+      setModalMessage("Failed to send verification email. Try again later.");
     }
   };
 
@@ -239,9 +262,11 @@ export default function ProfilePage() {
     } catch (error) {
       console.error("Error deleting account:", error);
       if (error.code === 'auth/requires-recent-login') {
-        alert("For security, please log out and log in again before deleting your account.");
+        setModalType("error");
+        setModalMessage("For security, please log out and log in again before deleting your account.");
       } else {
-        alert("Failed to delete account.");
+        setModalType("error");
+        setModalMessage("Failed to delete account.");
       }
     }
   };
@@ -283,9 +308,9 @@ export default function ProfilePage() {
             {phoneVerified ? (
               <span className={styles.verifiedBadge}><i className="fa-solid fa-check"></i> Phone Verified</span>
             ) : (
-              <span className={styles.unverifiedBadge}>
+              <button onClick={handleVerifyPhone} className={styles.unverifiedBadge} title="Click to verify phone">
                 <i className="fa-solid fa-triangle-exclamation"></i> Phone Pending
-              </span>
+              </button>
             )}
           </div>
         </div>
@@ -502,37 +527,67 @@ export default function ProfilePage() {
               Enter the 6-digit code sent to {formData.phone}
             </p>
 
-            {verifyError && <p className={styles.errorText}>{verifyError}</p>}
+            {verifyError && (
+              <div className={styles.errorText} style={{ marginBottom: '15px', color: '#dc3545' }}>
+                {verifyError}
+                <button
+                  onClick={() => setIsVerifyingPhone(false)}
+                  style={{ display: 'block', marginTop: '10px', background: 'none', border: 'none', color: '#666', textDecoration: 'underline', cursor: 'pointer' }}
+                >
+                  Close
+                </button>
+              </div>
+            )}
             {verifySuccess && <p className={styles.successText}>{verifySuccess}</p>}
 
-            {!verificationId ? (
+            {!verificationId && !verifyError ? (
               <div className={styles.loadingSpinner}>Sending code...</div>
             ) : (
-              <>
-                <input
-                  type="text"
-                  className={styles.modalInput}
-                  placeholder="123456"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value)}
-                  maxLength={6}
-                />
-                <div className={styles.modalActions}>
-                  <button
-                    className={styles.cancelBtn}
-                    onClick={() => setIsVerifyingPhone(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className={styles.confirmBtn}
-                    onClick={handleConfirmPhone}
-                  >
-                    Verify
-                  </button>
-                </div>
-              </>
+              !verifyError && (
+                <>
+                  <input
+                    type="text"
+                    className={styles.modalInput}
+                    placeholder="123456"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value)}
+                    maxLength={6}
+                  />
+                  <div className={styles.modalActions}>
+                    <button
+                      className={styles.cancelBtn}
+                      onClick={() => setIsVerifyingPhone(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className={styles.confirmBtn}
+                      onClick={handleConfirmPhone}
+                    >
+                      Verify
+                    </button>
+                  </div>
+                </>
+              )
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Generic Success/Error Modal */}
+      {modalMessage && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <h3 className={styles.modalTitle}>{modalType === 'success' ? 'Success' : 'Notice'}</h3>
+            <p className={styles.modalText}>{modalMessage}</p>
+            <div className={styles.modalActions}>
+              <button
+                className={styles.confirmBtn}
+                onClick={() => setModalMessage(null)}
+              >
+                OK
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -122,12 +122,29 @@ function OrderCard({ order }) {
                     marginTop: '20px',
                     paddingTop: '20px',
                     borderTop: '1px solid #eee',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '15px',
                     fontSize: '14px',
-                    color: '#666'
+                    color: '#555'
                 }}>
-                    <p><strong>Order ID:</strong> {order.id}</p>
-                    <p><strong>Booked on:</strong> {order.bookedAt?.toDate ? order.bookedAt.toDate().toLocaleDateString() : "N/A"}</p>
-                    <p><strong>Carrier ID:</strong> {order.carrierUid}</p>
+                    <div>
+                        <p style={{ margin: '0 0 5px', color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Order ID</p>
+                        <p style={{ margin: 0, fontWeight: '500', fontFamily: 'monospace' }}>{order.id}</p>
+                    </div>
+                    <div>
+                        <p style={{ margin: '0 0 5px', color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Booked On</p>
+                        <p style={{ margin: 0, fontWeight: '500' }}>{order.bookedAt?.toDate ? order.bookedAt.toDate().toLocaleDateString() : "N/A"}</p>
+                    </div>
+                    <div>
+                        <p style={{ margin: '0 0 5px', color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Carrier</p>
+                        <p style={{ margin: 0, fontWeight: '500' }}>{order.carrierName || "Unknown Carrier"}</p>
+                    </div>
+                    {/* Placeholder for future tracking info */}
+                    <div>
+                        <p style={{ margin: '0 0 5px', color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tracking</p>
+                        <p style={{ margin: 0, fontWeight: '500' }}>Not available</p>
+                    </div>
                 </div>
             )}
         </div>
