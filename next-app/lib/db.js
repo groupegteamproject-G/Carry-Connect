@@ -319,8 +319,8 @@ export const setCurrentTripId = (id) => currentTripId = id;
 export const sendTripMessage = async (text) => {
   if (!currentTripId || !auth.currentUser) return;
   
-  // START CHANGE: USE DISPLAY NAME FOR CONSISTENCY 
-  const senderName = auth.currentUser.displayName || auth.currentUser.email; // ADDED THIS LINE
+  //  USE DISPLAY NAME FOR CONSISTENCY 
+  const senderName = auth.currentUser.displayName || auth.currentUser.email; // ADDED 
 
   await addDoc(collection(db, "trips", currentTripId, "messages"), {
     text,
@@ -338,7 +338,7 @@ export const listenToTripChat = (callback) => {
     callback(messages);
   });
 };
-// END CHANGE
+// END
 
 // Generic conversation helpers (from firestore.js)
 export async function getConversations(userId) {
