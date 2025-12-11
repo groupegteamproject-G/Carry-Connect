@@ -260,11 +260,6 @@ export const bookTrip = async (tripId, { weight, pickupLocation, dropoffLocation
     throw new Error("Login required");
   }
 
-  if (!user) {
-    console.error("bookTrip: User is not authenticated.");
-    throw new Error("Login required");
-  }
-
   console.log("bookTrip: Proceeding with user:", user.uid);
   const tripRef = doc(db, "trips", tripId); // Restore tripRef definition
   console.log("bookTrip: tripRef path:", tripRef.path);
@@ -324,9 +319,13 @@ export const setCurrentTripId = (id) => currentTripId = id;
 
 export const sendTripMessage = async (text) => {
   if (!currentTripId || !auth.currentUser) return;
+  
+  //  USE DISPLAY NAME FOR CONSISTENCY 
+  const senderName = auth.currentUser.displayName || auth.currentUser.email; // ADDED 
+
   await addDoc(collection(db, "trips", currentTripId, "messages"), {
     text,
-    sender: auth.currentUser.email,
+    sender: senderName, // CHANGED FROM auth.currentUser.email TO senderName
     senderUid: auth.currentUser.uid,
     sentAt: serverTimestamp()
   });
@@ -340,6 +339,7 @@ export const listenToTripChat = (callback) => {
     callback(messages);
   });
 };
+// END
 
 // Generic conversation helpers (from firestore.js)
 export async function getConversations(userId) {
