@@ -145,7 +145,7 @@ export const postTrip = async ({ from, to, date, transportType, packageSize, pri
       from, to, date: new Date(date), transportType, packageSize, price: Number(price),
       description, carrierUid: auth.currentUser.uid, carrierEmail: auth.currentUser.email,
       carrierName: auth.currentUser.displayName || auth.currentUser.email,
-      status: "available", createdAt: serverTimestamp()
+      status: "available", createdAt: serverTimestamp(),
       testing: "testing",
     });
     console.log("postTrip: Trip created with ID:", tripRef.id);
