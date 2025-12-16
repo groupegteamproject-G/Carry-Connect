@@ -9,6 +9,7 @@ import {
   orderBy,
   query,
   where,
+  limit,
   serverTimestamp,
   deleteDoc,
   Timestamp,
@@ -338,6 +339,28 @@ export const listenToTripChat = (callback) => {
   return onSnapshot(q, (snap) => {
     const messages = snap.docs.map(d => ({ id: d.id, ...d.data(), sentAt: d.data().sentAt?.toDate() }));
     callback(messages);
+  });
+};
+
+export const listenToTripLastMessage = (tripId, callback) => {
+  if (!tripId) return () => { };
+  const q = query(
+    collection(db, "trips", tripId, "messages"),
+    orderBy("sentAt", "desc"),
+    limit(1)
+  );
+  return onSnapshot(q, (snap) => {
+    if (snap.empty) {
+      callback(null);
+      return;
+    }
+    const d = snap.docs[0];
+    const data = d.data();
+    callback({
+      id: d.id,
+      ...data,
+      sentAt: data.sentAt?.toDate ? data.sentAt.toDate() : null
+    });
   });
 };
 // END
