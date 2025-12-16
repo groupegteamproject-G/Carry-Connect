@@ -6,6 +6,7 @@ import {
   setCurrentTripId,
   sendTripMessage,
   listenToTripChat,
+  listenToTripLastMessage,
   auth,
   onAuthChange,
   getUserTrips, // IMPORTED FOR FETCHING CARRIER TRIPS
@@ -41,11 +42,7 @@ export default function MessagesPage() {
         // Fetch trips where the user is the shipper/booker
         const bookedOrders = await getUserOrders(user.uid); 
 
-        // Combine and filter for only booked conversations
-        const combinedChats = [...postedTrips, ...bookedOrders].filter(
-            // ONLY SHOW TRIPS THAT ARE 'BOOKED' FOR ACTIVE CHATS
-            (trip) => trip.status === 'booked' 
-        ); 
+        const combinedChats = [...postedTrips, ...bookedOrders].filter((trip) => trip.status === 'booked');
         
         // Map the data for display in the chat sidebar
         const formattedChats = combinedChats.map(trip => {
@@ -60,11 +57,14 @@ export default function MessagesPage() {
             
             return {
                 tripId: trip.id,
-                name: otherPersonName, // Name/Email of the other person
-                route: route,
-                lastMessage: 'Tap to open chat...', // Placeholder for last message
+                name: otherPersonName,
+                route,
+                lastMessage: "Tap to open chat...",
+                lastMessageAt: null,
+                lastMessageSenderUid: null,
+                unread: false,
                 avatar: otherPersonName ? otherPersonName[0].toUpperCase() : '?',
-                tripData: trip 
+                tripData: trip
             };
         });
 
@@ -77,6 +77,54 @@ export default function MessagesPage() {
 
     fetchConversations();
   }, [user]); // DEPENDENCY ON USER ENSURES THIS RUNS ONLY WHEN AUTH IS READY
+
+  const getSeenKey = (uid, tripId) => `cc_seen_${uid}_${tripId}`;
+
+  const getLastSeen = (uid, tripId) => {
+    try {
+      const raw = localStorage.getItem(getSeenKey(uid, tripId));
+      return raw ? Number(raw) : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const setLastSeen = (uid, tripId, ts) => {
+    try {
+      localStorage.setItem(getSeenKey(uid, tripId), String(ts));
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (!user || conversations.length === 0) return;
+
+    const unsubs = conversations.map((chat) => {
+      return listenToTripLastMessage(chat.tripId, (msg) => {
+        setConversations((prev) => {
+          const next = prev.map((c) => {
+            if (c.tripId !== chat.tripId) return c;
+            const lastSeen = getLastSeen(user.uid, chat.tripId);
+            const msgTime = msg?.sentAt ? new Date(msg.sentAt).getTime() : 0;
+            const unread = !!(msg && msgTime > lastSeen && msg.senderUid && msg.senderUid !== user.uid);
+            return {
+              ...c,
+              lastMessage: msg?.text || "Tap to open chat...",
+              lastMessageAt: msg?.sentAt || null,
+              lastMessageSenderUid: msg?.senderUid || null,
+              unread
+            };
+          });
+          return next;
+        });
+      });
+    });
+
+    return () => {
+      unsubs.forEach((u) => {
+        try { u && u(); } catch {}
+      });
+    };
+  }, [user, conversations.length]);
 
 
 
@@ -109,6 +157,7 @@ export default function MessagesPage() {
 
   // When user clicks a chat (only sets state to trigger the useEffect listener)
   const openChat = (tripId) => {
+    if (user) setLastSeen(user.uid, tripId, Date.now());
     setSelectedTripId(tripId);
   };
 
@@ -148,11 +197,18 @@ export default function MessagesPage() {
                     >
                       <div className={styles.chatAvatar}>{chat.avatar}</div>
                       <div className={styles.chatInfo}>
-                        <p className={styles.chatName}>{chat.name}</p>
+                        <p className={styles.chatName}>
+                          {chat.name}
+                          {chat.unread && <span className={styles.unreadDot} />}
+                        </p>
                         <p className={styles.chatRoute}>{chat.route}</p>
-                        <p className={styles.chatMsg}>{chat.lastMessage}</p>
+                        <p className={chat.unread ? `${styles.chatMsg} ${styles.chatMsgUnread}` : styles.chatMsg}>
+                          {chat.lastMessage}
+                        </p>
                       </div>
-                      <p className={styles.chatTime}>now</p>
+                      <p className={styles.chatTime}>
+                        {chat.lastMessageAt ? new Date(chat.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
+                      </p>
                     </div>
                 ))
             )
