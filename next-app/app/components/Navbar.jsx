@@ -99,149 +99,173 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="navbar">
-        {/* LEFT - Logo */}
-        <div className="navbar-left">
-          <Link href="/" className="logo cc-logo">
-            <span className="cc-logoMark">
-              <Image src="/favicon.ico" alt="CarryConnect" width={18} height={18} priority />
-            </span>
-            <span className="cc-brandText">CarryConnect</span>
-          </Link>
-        </div>
+      <nav className="cc-navbar">
+        <div className="cc-navContainer">
+          {/* LEFT - Logo */}
+          <div className="cc-navLeft">
+            <Link href="/" className="cc-logo">
+              <span className="cc-logoMark">
+                <Image src="/favicon.ico" alt="CarryConnect" width={18} height={18} priority />
+              </span>
+              <span className="cc-brandText">CarryConnect</span>
+            </Link>
+          </div>
 
-        {/* CENTER - Navigation Links (desktop) */}
-        <div className="navbar-center">
-          <Link href="/find-a-carrier" className="nav-link">Find a Carrier</Link>
-          <Link href="/add-trip" className="nav-link">Add Trip</Link>
+          {/* CENTER - Navigation Links */}
+          <div className="cc-navCenter">
+            <Link href="/find-a-carrier" className="cc-navLink">
+              Find a Carrier
+            </Link>
+            <Link href="/add-trip" className="cc-navLink">
+              Add Trip
+            </Link>
 
-          {user && (
-            <>
-              <Link href="/my-trips" className="nav-link">My Trips</Link>
-              <Link href="/my-orders" className="nav-link">My Orders</Link>
-            </>
-          )}
-        </div>
-
-        {/* RIGHT - Actions & User Menu */}
-        <div className="navbar-right">
-          {/* Search */}
-          <div className="cc-search">
-            {isSearchOpen ? (
-              <div className="cc-searchBox">
-                <i className="fa-solid fa-magnifying-glass cc-searchIcon"></i>
-                <input
-                  className="cc-searchInput"
-                  placeholder="Search..."
-                  autoFocus
-                  onBlur={() => setTimeout(() => setIsSearchOpen(false), 150)}
-                />
-                <button
-                  className="cc-searchClose"
-                  onClick={() => setIsSearchOpen(false)}
-                  aria-label="Close search"
-                >
-                  <i className="fa-solid fa-xmark"></i>
-                </button>
-              </div>
-            ) : (
-              <button
-                className="icon-wrap cc-iconBtn"
-                onClick={() => setIsSearchOpen(true)}
-                aria-label="Search"
-              >
-                <i className="fa-solid fa-magnifying-glass icon"></i>
-              </button>
+            {user && (
+              <>
+                <Link href="/my-trips" className="cc-navLink">
+                  My Trips
+                </Link>
+                <Link href="/my-orders" className="cc-navLink">
+                  My Orders
+                </Link>
+              </>
             )}
           </div>
 
-          {user ? (
-            <>
-              {/* Messages */}
-              <Link href="/messages" className="icon-wrap cc-iconBtn" aria-label="Messages">
-                <i className="fa-regular fa-comments icon"></i>
-                {hasUnread && <span className="icon-badge"></span>}
-              </Link>
-
-              {/* Notifications */}
-              <button className="icon-wrap cc-iconBtn" aria-label="Notifications">
-                <i className="fa-regular fa-bell icon"></i>
-              </button>
-
-              {/* Profile Avatar */}
-              <Link href="/profile" className="profile-avatar" aria-label="Profile">
-                <div className="avatar-placeholder">
-                  <i className="fa-solid fa-user"></i>
+          {/* RIGHT - Actions */}
+          <div className="cc-navRight">
+            {/* Search */}
+            <div className="cc-searchWrapper">
+              {isSearchOpen ? (
+                <div className="cc-searchExpanded">
+                  <i className="fa-solid fa-magnifying-glass cc-searchIconExpanded"></i>
+                  <input
+                    className="cc-searchInput"
+                    placeholder="Search trips, orders..."
+                    autoFocus
+                    onBlur={() => setTimeout(() => setIsSearchOpen(false), 150)}
+                  />
+                  <button
+                    className="cc-searchCloseBtn"
+                    onClick={() => setIsSearchOpen(false)}
+                    aria-label="Close search"
+                  >
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
                 </div>
-              </Link>
+              ) : (
+                <button
+                  className="cc-navIconBtn"
+                  onClick={() => setIsSearchOpen(true)}
+                  aria-label="Search"
+                  title="Search"
+                >
+                  <i className="fa-solid fa-magnifying-glass"></i>
+                </button>
+              )}
+            </div>
 
-              {/* Logout */}
-              <button onClick={handleLogout} className="cc-btn cc-btnSecondary">
-                Logout
-              </button>
-            </>
-          ) : (
-            !loading && (
-              <Link href="/auth" className="cc-btn cc-btnPrimary">
-                Login / Sign Up
-              </Link>
-            )
-          )}
+            {user ? (
+              <>
+                {/* Messages */}
+                <Link href="/messages" className="cc-navIconBtn" aria-label="Messages" title="Messages">
+                  <i className="fa-regular fa-comments"></i>
+                  {hasUnread && <span className="cc-notificationDot"></span>}
+                </Link>
 
-          {/* Mobile Toggle */}
-          <button
-            className="cc-mobileToggle"
-            onClick={() => setIsMobileMenuOpen((s) => !s)}
-            aria-label="Toggle menu"
-          >
-            <i className={`fa-solid ${isMobileMenuOpen ? "fa-xmark" : "fa-bars"}`}></i>
-          </button>
+                {/* Profile */}
+                <Link href="/profile" className="cc-navIconBtn" aria-label="Profile" title="Profile">
+                  <i className="fa-regular fa-user"></i>
+                </Link>
+
+                {/* Logout Button */}
+                <button onClick={handleLogout} className="cc-navBtn cc-navBtnSecondary">
+                  Logout
+                </button>
+              </>
+            ) : (
+              !loading && (
+                <Link href="/auth" className="cc-navBtn cc-navBtnPrimary">
+                  Sign In
+                </Link>
+              )
+            )}
+
+            {/* Mobile Menu Toggle */}
+            <button
+              className="cc-mobileMenuBtn"
+              onClick={() => setIsMobileMenuOpen((s) => !s)}
+              aria-label="Toggle menu"
+            >
+              <i className={`fa-solid ${isMobileMenuOpen ? "fa-xmark" : "fa-bars"}`}></i>
+            </button>
+          </div>
         </div>
       </nav>
 
       {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="cc-mobileMenu">
-          <Link href="/find-a-carrier" onClick={() => setIsMobileMenuOpen(false)} className="mobile-nav-link">
-            Find a Carrier
-          </Link>
-          <Link href="/add-trip" onClick={() => setIsMobileMenuOpen(false)} className="mobile-nav-link">
-            Add Trip
-          </Link>
+      <div className={`cc-mobileMenuOverlay ${isMobileMenuOpen ? "cc-mobileMenuOpen" : ""}`}>
+        <div className="cc-mobileMenuContent">
+          <div className="cc-mobileMenuLinks">
+            <Link href="/find-a-carrier" onClick={() => setIsMobileMenuOpen(false)} className="cc-mobileLink">
+              <i className="fa-solid fa-truck"></i>
+              <span>Find a Carrier</span>
+            </Link>
+            <Link href="/add-trip" onClick={() => setIsMobileMenuOpen(false)} className="cc-mobileLink">
+              <i className="fa-solid fa-plus-circle"></i>
+              <span>Add Trip</span>
+            </Link>
 
-          {user && (
-            <>
-              <Link href="/my-trips" onClick={() => setIsMobileMenuOpen(false)} className="mobile-nav-link">
-                My Trips
-              </Link>
-              <Link href="/my-orders" onClick={() => setIsMobileMenuOpen(false)} className="mobile-nav-link">
-                My Orders
-              </Link>
-              <Link href="/messages" onClick={() => setIsMobileMenuOpen(false)} className="mobile-nav-link">
-                Messages {hasUnread ? "•" : ""}
-              </Link>
-              <Link href="/profile" onClick={() => setIsMobileMenuOpen(false)} className="mobile-nav-link">
-                Profile
-              </Link>
+            {user && (
+              <>
+                <Link href="/my-trips" onClick={() => setIsMobileMenuOpen(false)} className="cc-mobileLink">
+                  <i className="fa-solid fa-route"></i>
+                  <span>My Trips</span>
+                </Link>
+                <Link href="/my-orders" onClick={() => setIsMobileMenuOpen(false)} className="cc-mobileLink">
+                  <i className="fa-solid fa-box"></i>
+                  <span>My Orders</span>
+                </Link>
+                <Link href="/messages" onClick={() => setIsMobileMenuOpen(false)} className="cc-mobileLink">
+                  <i className="fa-regular fa-comments"></i>
+                  <span>Messages</span>
+                  {hasUnread && <span className="cc-mobileBadge">•</span>}
+                </Link>
+                <Link href="/profile" onClick={() => setIsMobileMenuOpen(false)} className="cc-mobileLink">
+                  <i className="fa-regular fa-user"></i>
+                  <span>Profile</span>
+                </Link>
+              </>
+            )}
+          </div>
+
+          <div className="cc-mobileMenuFooter">
+            {user ? (
               <button
                 onClick={() => {
                   handleLogout()
                   setIsMobileMenuOpen(false)
                 }}
-                className="cc-mobileLogout"
+                className="cc-mobileActionBtn cc-mobileLogoutBtn"
               >
-                Logout
+                <i className="fa-solid fa-right-from-bracket"></i>
+                <span>Logout</span>
               </button>
-            </>
-          )}
-
-          {!user && !loading && (
-            <Link href="/auth" onClick={() => setIsMobileMenuOpen(false)} className="cc-mobileAuth">
-              Login / Sign Up
-            </Link>
-          )}
+            ) : (
+              !loading && (
+                <Link
+                  href="/auth"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="cc-mobileActionBtn cc-mobileAuthBtn"
+                >
+                  <i className="fa-solid fa-arrow-right-to-bracket"></i>
+                  <span>Sign In</span>
+                </Link>
+              )
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </>
   )
 }
