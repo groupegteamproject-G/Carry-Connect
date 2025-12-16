@@ -13,79 +13,86 @@ body {
 /* ============================================
    NAVBAR MAIN CONTAINER
    ============================================ */
-.navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: white;
-  padding: 12px 40px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+.cc-navbar {
   position: sticky;
   top: 0;
-  z-index: 100;
-  gap: 30px;
+  z-index: 50;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.cc-navContainer {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
 }
 
 /* ============================================
    NAVBAR LEFT - LOGO SECTION
    ============================================ */
-.navbar-left {
+.cc-navLeft {
   flex-shrink: 0;
-}
-
-.navbar-left .logo {
-  font-size: 1.5rem;
-  font-weight: 700;
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  transition: opacity 0.2s ease;
-}
-
-.navbar-left .logo:hover {
-  opacity: 0.8;
 }
 
 .cc-logo {
   display: flex;
   align-items: center;
   gap: 10px;
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.cc-logo:hover {
+  opacity: 0.9;
 }
 
 .cc-logoMark {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
   background: linear-gradient(135deg, #0077ff, #7c3aed);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 2px;
   box-shadow: 0 4px 12px rgba(0, 119, 255, 0.15);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   flex-shrink: 0;
+}
+
+.cc-logo:hover .cc-logoMark {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 119, 255, 0.2);
 }
 
 .cc-logoMark img {
   background: white;
-  border-radius: 8px;
-  padding: 5px;
+  border-radius: 10px;
+  padding: 6px;
 }
 
 .cc-brandText {
-  font-size: 1.2rem;
-  font-weight: 800;
+  font-size: 1.25rem;
+  font-weight: 700;
   background: linear-gradient(90deg, #0077ff, #7c3aed);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.02em;
 }
 
 /* ============================================
    NAVBAR CENTER - NAVIGATION LINKS
    ============================================ */
-.navbar-center {
+.cc-navCenter {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -93,69 +100,98 @@ body {
   justify-content: center;
 }
 
-.nav-link {
-  padding: 8px 14px;
-  text-decoration: none;
-  color: #4b5563;
-  font-weight: 500;
-  font-size: 0.95rem;
-  transition: all 0.2s ease;
-  border-radius: 8px;
+.cc-navLink {
   position: relative;
+  padding: 8px 16px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #374151;
+  text-decoration: none;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
-.nav-link:hover {
+.cc-navLink:hover {
   color: #0077ff;
-  background-color: #f0f7ff;
+  background: rgba(0, 119, 255, 0.06);
+}
+
+.cc-navLink::after {
+  content: "";
+  position: absolute;
+  bottom: 6px;
+  left: 16px;
+  right: 16px;
+  height: 2px;
+  background: #0077ff;
+  border-radius: 2px;
+  transform: scaleX(0);
+  transition: transform 0.2s ease;
+}
+
+.cc-navLink:hover::after {
+  transform: scaleX(1);
 }
 
 /* ============================================
-   NAVBAR RIGHT - ACTIONS & USER MENU
+   NAVBAR RIGHT - ACTIONS
    ============================================ */
-.navbar-right {
+.cc-navRight {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
 /* ============================================
    SEARCH FUNCTIONALITY
    ============================================ */
-.cc-search {
-  display: flex;
-  align-items: center;
+.cc-searchWrapper {
+  position: relative;
 }
 
-.cc-searchBox {
+.cc-searchExpanded {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: #f3f4f6;
+  gap: 10px;
+  padding: 8px 14px;
+  background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  padding: 8px 12px;
   transition: all 0.2s ease;
+  animation: expandSearch 0.2s ease;
 }
 
-.cc-searchBox:focus-within {
+@keyframes expandSearch {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.cc-searchExpanded:focus-within {
+  background: white;
   border-color: #0077ff;
-  background: #f0f7ff;
   box-shadow: 0 0 0 3px rgba(0, 119, 255, 0.1);
 }
 
-.cc-searchIcon {
+.cc-searchIconExpanded {
   color: #9ca3af;
-  font-size: 14px;
+  font-size: 0.875rem;
   flex-shrink: 0;
 }
 
 .cc-searchInput {
   width: 200px;
-  border: 0;
+  border: none;
   outline: none;
   background: transparent;
-  font-size: 14px;
+  font-size: 0.9375rem;
   color: #111827;
   font-family: "Poppins", sans-serif;
 }
@@ -164,240 +200,265 @@ body {
   color: #9ca3af;
 }
 
-.cc-searchClose {
-  border: 0;
+.cc-searchCloseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
   background: transparent;
+  color: #6b7280;
+  font-size: 0.875rem;
+  border-radius: 6px;
   cursor: pointer;
-  color: #9ca3af;
-  font-size: 14px;
+  transition: all 0.2s ease;
   flex-shrink: 0;
-  transition: color 0.2s ease;
 }
 
-.cc-searchClose:hover {
-  color: #6b7280;
+.cc-searchCloseBtn:hover {
+  background: #f3f4f6;
+  color: #374151;
 }
 
 /* ============================================
    ICON BUTTONS
    ============================================ */
-.icon-wrap {
+.cc-navIconBtn {
   position: relative;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: none;
   background: transparent;
-  cursor: pointer;
-}
-
-.cc-iconBtn {
-  width: 40px;
-  height: 40px;
+  color: #374151;
+  font-size: 1.125rem;
   border-radius: 10px;
-  transition: all 0.2s ease;
-  border: none;
-  background: transparent;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  transition: all 0.2s ease;
+  text-decoration: none;
 }
 
-.cc-iconBtn:hover {
-  background: #f3f4f6;
-}
-
-.icon {
-  color: #6b7280;
-  font-size: 1.1rem;
-  transition: color 0.2s ease;
-}
-
-.cc-iconBtn:hover .icon {
+.cc-navIconBtn:hover {
+  background: rgba(0, 119, 255, 0.08);
   color: #0077ff;
+  transform: translateY(-1px);
 }
 
-.icon-badge {
+/* Notification Dot */
+.cc-notificationDot {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  top: 8px;
+  right: 8px;
   width: 8px;
   height: 8px;
-  border-radius: 999px;
-  background: #ef4444;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
   border: 2px solid white;
-  box-shadow: 0 0 0 2px #f3f4f6;
+  border-radius: 50%;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 /* ============================================
-   PROFILE AVATAR
+   ACTION BUTTONS
    ============================================ */
-.profile-avatar {
+.cc-navBtn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: #f3f4f6;
-  text-decoration: none;
-  transition: all 0.2s ease;
-  border: 2px solid transparent;
-}
-
-.profile-avatar:hover {
-  background: #e5e7eb;
-  border-color: #0077ff;
-}
-
-.avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #6b7280;
-  font-size: 1rem;
-}
-
-/* ============================================
-   BUTTONS
-   ============================================ */
-.cc-btn {
-  border: 0;
-  border-radius: 10px;
-  padding: 8px 16px;
+  gap: 8px;
+  padding: 10px 18px;
+  font-size: 0.9375rem;
   font-weight: 600;
+  border: none;
+  border-radius: 10px;
   cursor: pointer;
   text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.9rem;
   transition: all 0.2s ease;
+  white-space: nowrap;
   font-family: "Poppins", sans-serif;
 }
 
-.cc-btnPrimary {
-  background: linear-gradient(90deg, #0077ff, #7c3aed);
+.cc-navBtnPrimary {
+  background: linear-gradient(135deg, #0077ff, #0060d9);
   color: white;
   box-shadow: 0 2px 8px rgba(0, 119, 255, 0.2);
 }
 
-.cc-btnPrimary:hover {
-  box-shadow: 0 4px 16px rgba(0, 119, 255, 0.3);
+.cc-navBtnPrimary:hover {
+  background: linear-gradient(135deg, #0060d9, #004bb3);
+  box-shadow: 0 4px 12px rgba(0, 119, 255, 0.3);
   transform: translateY(-1px);
 }
 
-.cc-btnSecondary {
-  background: transparent;
-  color: #ef4444;
-  border: 1.5px solid #fee2e2;
-  font-weight: 600;
+.cc-navBtnSecondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
 }
 
-.cc-btnSecondary:hover {
-  background: #fee2e2;
-  border-color: #fecaca;
-}
-
-.cc-btnDanger {
-  background: linear-gradient(90deg, #ef4444, #dc2626);
-  color: white;
-}
-
-.cc-btnDanger:hover {
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+.cc-navBtnSecondary:hover {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+  transform: translateY(-1px);
 }
 
 /* ============================================
-   MOBILE MENU TOGGLE
+   MOBILE MENU BUTTON
    ============================================ */
-.cc-mobileToggle {
+.cc-mobileMenuBtn {
   display: none;
-  border: 0;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: none;
   background: transparent;
-  cursor: pointer;
-  font-size: 20px;
-  color: #111827;
-  transition: color 0.2s ease;
-}
-
-.cc-mobileToggle:hover {
-  color: #0077ff;
-}
-
-/* ============================================
-   MOBILE MENU
-   ============================================ */
-.cc-mobileMenu {
-  display: none;
-  background: white;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 12px 20px;
-  animation: slideDown 0.3s ease;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.mobile-nav-link {
-  display: block;
-  padding: 12px 14px;
+  color: #374151;
+  font-size: 1.25rem;
   border-radius: 10px;
-  text-decoration: none;
-  color: #4b5563;
-  font-weight: 500;
-  margin-bottom: 4px;
+  cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.mobile-nav-link:hover {
-  background: #f3f4f6;
+.cc-mobileMenuBtn:hover {
+  background: rgba(0, 119, 255, 0.08);
   color: #0077ff;
 }
 
-.cc-mobileLogout {
-  width: 100%;
-  margin-top: 12px;
-  background: #fee2e2;
-  color: #b91c1c;
-  border: 0;
-  border-radius: 10px;
-  padding: 12px 14px;
+/* ============================================
+   MOBILE MENU OVERLAY
+   ============================================ */
+.cc-mobileMenuOverlay {
+  position: fixed;
+  top: 64px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0);
+  backdrop-filter: blur(0px);
+  z-index: 40;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+.cc-mobileMenuOverlay.cc-mobileMenuOpen {
+  opacity: 1;
+  visibility: visible;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
+}
+
+.cc-mobileMenuContent {
+  background: white;
+  border-radius: 0 0 20px 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  transform: translateY(-20px);
+  transition: transform 0.3s ease;
+}
+
+.cc-mobileMenuOpen .cc-mobileMenuContent {
+  transform: translateY(0);
+}
+
+.cc-mobileMenuLinks {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cc-mobileLink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  font-size: 1rem;
   font-weight: 600;
+  color: #111827;
+  text-decoration: none;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.cc-mobileLink:hover {
+  background: rgba(0, 119, 255, 0.06);
+  color: #0077ff;
+}
+
+.cc-mobileLink i {
+  font-size: 1.125rem;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.cc-mobileBadge {
+  position: absolute;
+  right: 16px;
+  color: #ef4444;
+  font-weight: 800;
+  font-size: 1.2rem;
+}
+
+.cc-mobileMenuFooter {
+  padding: 12px 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.cc-mobileActionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 12px;
   cursor: pointer;
+  text-decoration: none;
   transition: all 0.2s ease;
   font-family: "Poppins", sans-serif;
 }
 
-.cc-mobileLogout:hover {
+.cc-mobileActionBtn i {
+  font-size: 1.125rem;
+}
+
+.cc-mobileLogoutBtn {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.cc-mobileLogoutBtn:hover {
   background: #fecaca;
 }
 
-.cc-mobileAuth {
-  display: block;
-  margin-top: 12px;
-  background: linear-gradient(90deg, #0077ff, #7c3aed);
+.cc-mobileAuthBtn {
+  background: linear-gradient(135deg, #0077ff, #0060d9);
   color: white;
-  text-align: center;
-  padding: 12px 14px;
-  border-radius: 10px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 119, 255, 0.2);
 }
 
-.cc-mobileAuth:hover {
+.cc-mobileAuthBtn:hover {
   box-shadow: 0 4px 12px rgba(0, 119, 255, 0.3);
 }
 
@@ -405,18 +466,18 @@ body {
    RESPONSIVE DESIGN
    ============================================ */
 @media (max-width: 1024px) {
-  .navbar {
-    padding: 12px 24px;
-    gap: 20px;
+  .cc-navContainer {
+    padding: 0 20px;
+    gap: 24px;
   }
 
-  .navbar-center {
+  .cc-navCenter {
     gap: 4px;
   }
 
-  .nav-link {
+  .cc-navLink {
     padding: 6px 12px;
-    font-size: 0.9rem;
+    font-size: 0.875rem;
   }
 
   .cc-searchInput {
@@ -425,16 +486,21 @@ body {
 }
 
 @media (max-width: 768px) {
-  .navbar {
+  .cc-navbar {
+    height: auto;
+  }
+
+  .cc-navContainer {
     padding: 12px 16px;
+    height: auto;
     gap: 12px;
   }
 
-  .navbar-center {
+  .cc-navCenter {
     display: none;
   }
 
-  .navbar-left .logo {
+  .cc-navLeft .cc-logo {
     gap: 8px;
   }
 
@@ -443,8 +509,278 @@ body {
   }
 
   .cc-logoMark {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .cc-mobileMenuBtn {
+    display: inline-flex;
+    margin-left: auto;
+  }
+
+  .cc-mobileMenuBtn:hover {
+    background: #f3f4f6;
+  }
+
+  .cc-searchInput {
+    width: 120px;
+  }
+
+  .cc-navRight {
+    gap: 6px;
+  }
+
+  .cc-navBtn {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+
+  .cc-navIconBtn {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+@media (max-width: 480px) {
+  .cc-navContainer {
+    padding: 10px 12px;
+  }
+
+  .cc-searchWrapper {
+    display: none;
+  }
+
+  .cc-navRight {
+    gap: 4px;
+  }
+
+  .cc-navIconBtn {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+  }
+
+  .cc-navBtn {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+
+  .cc-mobileMenuLinks {
+    padding: 12px;
+    gap: 2px;
+  }
+
+  .cc-mobileLink {
+    padding: 12px 14px;
+    font-size: 0.95rem;
+  }
+
+  .cc-mobileMenuFooter {
+    padding: 10px 12px;
+  }
+
+  .cc-mobileActionBtn {
+    padding: 12px 14px;
+    font-size: 0.95rem;
+  }
+}
+
+/* ============================================
+   LEGACY COMPATIBILITY (for existing code)
+   ============================================ */
+.navbar {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background-color: white;
+  padding: 10px 30px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.navbar-left .logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0077ff;
+  text-decoration: none;
+}
+
+.navbar-center a {
+  margin: 0 15px;
+  text-decoration: none;
+  color: #333;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.navbar-center a:hover {
+  color: #0077ff;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.icon {
+  color: #333;
+  font-size: 1.2rem;
+  transition: color 0.2s ease;
+}
+
+.icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #ff3b30;
+  border: 2px solid white;
+}
+
+.icon:hover {
+  color: #0077ff;
+}
+
+.add-trip-btn {
+  background-color: #0077ff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.add-trip-btn:hover {
+  background-color: #005fcc;
+}
+
+.cc-btn {
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cc-btnPrimary {
+  background: linear-gradient(90deg, #0077ff, #7c3aed);
+  color: white;
+}
+
+.cc-btnDanger {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+  color: white;
+}
+
+.cc-iconBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+
+.cc-iconBtn:hover {
+  background: #f3f4f6;
+}
+
+.cc-searchBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 8px 10px;
+}
+
+.cc-searchIcon {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.cc-searchInput {
+  width: 220px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+}
+
+.cc-searchClose {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.cc-mobileToggle {
+  display: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.cc-mobileMenu {
+  display: none;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 12px 18px;
+}
+
+.cc-mobileMenu a {
+  display: block;
+  padding: 10px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: #111827;
+  font-weight: 600;
+}
+
+.cc-mobileMenu a:hover {
+  background: #f3f4f6;
+}
+
+.cc-mobileLogout {
+  width: 100%;
+  margin-top: 8px;
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.cc-mobileAuth {
+  margin-top: 8px;
+  background: linear-gradient(90deg, #0077ff, #7c3aed);
+  color: white;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .navbar-center {
+    display: none;
   }
 
   .cc-mobileToggle {
@@ -454,11 +790,6 @@ body {
     width: 40px;
     height: 40px;
     border-radius: 10px;
-    margin-left: auto;
-  }
-
-  .cc-mobileToggle:hover {
-    background: #f3f4f6;
   }
 
   .cc-mobileMenu {
@@ -466,56 +797,6 @@ body {
   }
 
   .cc-searchInput {
-    width: 120px;
-  }
-
-  .navbar-right {
-    gap: 8px;
-  }
-
-  .cc-btn {
-    padding: 8px 12px;
-    font-size: 0.85rem;
-  }
-
-  .cc-iconBtn {
-    width: 36px;
-    height: 36px;
-  }
-
-  .icon {
-    font-size: 1rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .navbar {
-    padding: 10px 12px;
-  }
-
-  .cc-search {
-    display: none;
-  }
-
-  .navbar-right {
-    gap: 6px;
-  }
-
-  .cc-iconBtn {
-    width: 36px;
-    height: 36px;
-  }
-
-  .cc-btn {
-    padding: 6px 10px;
-    font-size: 0.8rem;
-  }
-
-  .cc-mobileMenu {
-    padding: 10px 12px;
-  }
-
-  .mobile-nav-link {
-    padding: 10px 12px;
+    width: 150px;
   }
 }
