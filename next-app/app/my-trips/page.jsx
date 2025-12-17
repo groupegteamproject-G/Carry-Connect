@@ -1,220 +1,194 @@
-.container {
-  min-height: 100vh;
-  padding: 40px 20px;
-  background: #f5f7fa;
-  max-width: 1200px;
-  margin: 0 auto;
-}
+"use client";
 
-.loading {
-  text-align: center;
-  padding: 100px 20px;
-  font-size: 18px;
-  color: #666;
-}
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import ConfirmationModal from "../components/ConfirmationModal";
+import styles from "./mytrips.module.css";
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-}
+export default function MyTripsPage() {
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+  const [trips, setTrips] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-.title {
-  font-size: 32px;
-  font-weight: bold;
-  color: #333;
-}
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalConfig, setModalConfig] = useState({ title: "", message: "", isAlert: false });
+  const [tripToDelete, setTripToDelete] = useState(null);
 
-.addBtn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 12px 24px;
-  border-radius: 10px;
-  text-decoration: none;
-  font-weight: 600;
-  transition: transform 0.2s;
-}
+  useEffect(() => {
+    let unsubscribe = () => { };
 
-.addBtn:hover {
-  transform: translateY(-2px);
-}
+    async function loadUserTrips() {
+      try {
+        const { getCurrentUser } = await import("../../lib/auth");
+        const currentUser = await getCurrentUser();
 
-.empty {
-  text-align: center;
-  padding: 80px 20px;
-  background: white;
-  border-radius: 20px;
-}
+        if (!currentUser) {
+          router.push("/auth");
+          return;
+        }
 
-.emptyIcon {
-  font-size: 64px;
-  margin-bottom: 20px;
-}
+        setUser(currentUser);
 
-.empty h2 {
-  font-size: 24px;
-  color: #333;
-  margin-bottom: 10px;
-}
+        const { listenToMyTrips } = await import("../../lib/db");
+        unsubscribe = listenToMyTrips((userTrips) => {
+          setTrips(userTrips);
+          setLoading(false);
+        });
+      } catch (error) {
+        console.error("Error loading trips:", error);
+        setLoading(false);
+      }
+    }
 
-.empty p {
-  color: #666;
-  margin-bottom: 30px;
-}
+    loadUserTrips();
+    return () => unsubscribe();
+  }, [router]);
 
-.emptyBtn {
-  display: inline-block;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 14px 32px;
-  border-radius: 10px;
-  text-decoration: none;
-  font-weight: 600;
-}
+  const handleDeleteClick = (trip) => {
+    if (trip.status === "booked") {
+      setModalConfig({
+        title: "Cannot Delete Trip",
+        message: "This trip has been booked by a user. To ensure reliability, you cannot delete it directly. Please contact support if you have an urgent issue.",
+        isAlert: true
+      });
+      setIsModalOpen(true);
+      return;
+    }
+    setTripToDelete(trip.id);
+    setModalConfig({
+      title: "Delete Trip",
+      message: "Are you sure you want to delete this trip? This action cannot be undone.",
+      isAlert: false
+    });
+    setIsModalOpen(true);
+  };
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 20px;
-}
+  const handleConfirmDelete = async () => {
+    if (!tripToDelete) return;
 
-.card {
-  background: white;
-  border-radius: 15px;
-  padding: 20px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s;
-}
+    setSuccessMsg("");
+    setErrorMsg("");
+    setIsModalOpen(false);
 
-.card:hover {
-  transform: translateY(-5px);
-}
+    try {
+      const { deleteTrip } = await import("../../lib/db");
+      await deleteTrip(tripToDelete);
+      // setTrips is handled by the listener automatically
+      setSuccessMsg("Trip deleted successfully!");
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (error) {
+      console.error("Error deleting trip:", error);
+      setErrorMsg("Failed to delete trip");
+      setTimeout(() => setErrorMsg(""), 3000);
+    } finally {
+      setTripToDelete(null);
+    }
+  };
 
-.cardHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
+  if (loading) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.loading}>Loading your trips...</div>
+      </div>
+    );
+  }
 
-.badge {
-  background: #e3f2fd;
-  color: #1976d2;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-}
+  return (
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <h1 className={styles.title}>My Trips</h1>
+        <Link href="/add-trip" className={styles.addBtn}>
+          + Add New Trip
+        </Link>
+      </div>
 
-.status {
-  background: #e8f5e9;
-  color: #2e7d32;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: capitalize;
-}
+      {successMsg && (
+        <div className={styles.alertSuccess}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className={styles.alertError}>
+          {errorMsg}
+        </div>
+      )}
 
-.route {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 15px;
-}
+      {trips.length === 0 ? (
+        <div className={styles.empty}>
+          <div className={styles.emptyIcon}>✈️</div>
+          <h2>No trips yet</h2>
+          <p>Start by posting your first trip!</p>
+          <Link href="/add-trip" className={styles.emptyBtn}>
+            Post a Trip
+          </Link>
+        </div>
+      ) : (
+        <div className={styles.grid}>
+          {trips.map((trip) => (
+            <div key={trip.id} className={styles.card}>
+              <div className={styles.cardHeader}>
+                <span className={styles.badge}>{trip.transportType}</span>
+                <span className={styles.status}>{trip.status}</span>
+              </div>
 
-.location {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #333;
-  font-weight: 500;
-}
+              <div className={styles.route}>
+                <div className={styles.location}>
+                  <i className="fa-solid fa-location-dot"></i>
+                  <span>{trip.from}</span>
+                </div>
+                <div className={styles.arrow}>→</div>
+                <div className={styles.location}>
+                  <i className="fa-solid fa-location-dot"></i>
+                  <span>{trip.to}</span>
+                </div>
+              </div>
 
-.arrow {
-  font-size: 20px;
-  color: #999;
-}
+              <div className={styles.details}>
+                <div className={styles.detail}>
+                  <i className="fa-solid fa-calendar"></i>
+                  <span>{trip.date ? new Date(trip.date).toLocaleDateString() : 'N/A'}</span>
+                </div>
+                <div className={styles.detail}>
+                  <i className="fa-solid fa-box"></i>
+                  <span>{trip.packageSize}</span>
+                </div>
+                <div className={styles.detail}>
+                  <i className="fa-solid fa-dollar-sign"></i>
+                  <span>${trip.price}</span>
+                </div>
+              </div>
 
-.details {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 15px;
-}
+              {trip.description && (
+                <p className={styles.description}>{trip.description}</p>
+              )}
 
-.detail {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #666;
-  font-size: 14px;
-}
+              <div className={styles.actions}>
+                <button
+                  onClick={() => handleDeleteClick(trip)}
+                  className={trip.status === 'booked' ? styles.deleteBtnDisabled : styles.deleteBtn}
+                  title={trip.status === 'booked' ? "Cannot delete booked trip" : "Delete trip"}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
-.detail i {
-  width: 20px;
-  color: #667eea;
-}
 
-.description {
-  color: #666;
-  font-size: 14px;
-  margin-bottom: 15px;
-  padding: 10px;
-  background: #f5f5f5;
-  border-radius: 8px;
-}
-
-.actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 15px;
-}
-
-.deleteBtn {
-  flex: 1;
-  padding: 10px;
-  background: #f44336;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: background 0.2s;
-}
-
-.deleteBtn:hover {
-  background: #d32f2f;
-}
-
-.deleteBtnDisabled {
-  flex: 1;
-  padding: 10px;
-  background: #f44336;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: not-allowed;
-  font-weight: 600;
-  opacity: 0.5;
-}
-
-/* Alerts */
-.alertSuccess,
-.alertError {
-  padding: 10px;
-  border-radius: 5px;
-  margin-bottom: 15px;
-  text-align: center;
-}
-
-.alertSuccess {
-  color: green;
-  background: #e6fffa;
-}
-
-.alertError {
-  color: red;
-  background: #ffe6e6;
+      <ConfirmationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        isAlert={modalConfig.isAlert}
+      />
+    </div>
+  );
 }
