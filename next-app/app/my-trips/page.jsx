@@ -1,72 +1,220 @@
-"use client";
+.container {
+  min-height: 100vh;
+  padding: 40px 20px;
+  background: #f5f7fa;
+  max-width: 1200px;
+  margin: 0 auto;
+}
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import styles from "./mytrips.module.css";
-import { auth, listenToUserTrips, deleteTrip } from "../../lib/db";
+.loading {
+  text-align: center;
+  padding: 100px 20px;
+  font-size: 18px;
+  color: #666;
+}
 
-export default function MyTripsPage() {
-  const router = useRouter();
-  const [trips, setTrips] = useState([]);
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
 
-  useEffect(() => {
-    if (!auth.currentUser) {
-      router.push("/auth");
-      return;
-    }
+.title {
+  font-size: 32px;
+  font-weight: bold;
+  color: #333;
+}
 
-    const unsubscribe = listenToUserTrips(auth.currentUser.uid, setTrips);
-    return () => unsubscribe();
-  }, [router]);
+.addBtn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: transform 0.2s;
+}
 
-  const handleDelete = async (trip) => {
-    if (trip.status !== "available") return;
-    await deleteTrip(trip.id);
-  };
+.addBtn:hover {
+  transform: translateY(-2px);
+}
 
-  return (
-    <div className={styles.container}>
-      <h1>My Trips</h1>
+.empty {
+  text-align: center;
+  padding: 80px 20px;
+  background: white;
+  border-radius: 20px;
+}
 
-      <div className={styles.grid}>
-        {trips.map((trip) => (
-          <div key={trip.id} className={styles.card}>
-            <h3>
-              {trip.from} → {trip.to}
-            </h3>
-            <p>Status: {trip.status}</p>
+.emptyIcon {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
 
-            {trip.status === "pending" && (
-              <>
-                <button
-                  onClick={async () => {
-                    const { acceptBooking } = await import("../../lib/db");
-                    await acceptBooking(trip.id);
-                  }}
-                >
-                  Accept
-                </button>
+.empty h2 {
+  font-size: 24px;
+  color: #333;
+  margin-bottom: 10px;
+}
 
-                <button
-                  onClick={async () => {
-                    const { rejectBooking } = await import("../../lib/db");
-                    await rejectBooking(trip.id);
-                  }}
-                >
-                  Reject
-                </button>
-              </>
-            )}
+.empty p {
+  color: #666;
+  margin-bottom: 30px;
+}
 
-            <button
-              onClick={() => handleDelete(trip)}
-              disabled={trip.status !== "available"}
-            >
-              Delete
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+.emptyBtn {
+  display: inline-block;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 14px 32px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: white;
+  border-radius: 15px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.badge {
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.route {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.location {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #333;
+  font-weight: 500;
+}
+
+.arrow {
+  font-size: 20px;
+  color: #999;
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.detail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #666;
+  font-size: 14px;
+}
+
+.detail i {
+  width: 20px;
+  color: #667eea;
+}
+
+.description {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 15px;
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.deleteBtn {
+  flex: 1;
+  padding: 10px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.deleteBtn:hover {
+  background: #d32f2f;
+}
+
+.deleteBtnDisabled {
+  flex: 1;
+  padding: 10px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: not-allowed;
+  font-weight: 600;
+  opacity: 0.5;
+}
+
+/* Alerts */
+.alertSuccess,
+.alertError {
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.alertSuccess {
+  color: green;
+  background: #e6fffa;
+}
+
+.alertError {
+  color: red;
+  background: #ffe6e6;
 }
