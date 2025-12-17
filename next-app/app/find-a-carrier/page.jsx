@@ -64,7 +64,8 @@ function FindCarrierContent() {
 
       let matchesDate = true;
       if (dateQuery) {
-        const tripDate = new Date(trip.date).setHours(0, 0, 0, 0);
+        const tripDateObj = trip.date?.toDate ? trip.date.toDate() : new Date(trip.date); 
+        const tripDate = tripDateObj.setHours(0, 0, 0, 0);
         const queryDate = new Date(dateQuery).setHours(0, 0, 0, 0);
         matchesDate = tripDate >= queryDate;
       }
@@ -187,7 +188,7 @@ function FindCarrierContent() {
                       <span className={styles.routeText}>{carrier.from} → {carrier.to}</span>
                       <span className={styles.cardDate}>
                         <i className="fa-regular fa-calendar" style={{ marginRight: '5px' }}></i>
-                        {carrier.date ? new Date(carrier.date).toLocaleDateString() : 'Date'}
+                        {carrier.date   ? (carrier.date?.toDate ? carrier.date.toDate() : new Date(carrier.date)).toLocaleDateString()   : "Date"}
                       </span>
                     </div>
                   </div>
