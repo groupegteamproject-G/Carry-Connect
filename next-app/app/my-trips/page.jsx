@@ -148,7 +148,6 @@ export default function MyTripsPage() {
       {successMsg && <div className={styles.alertSuccess}>{successMsg}</div>}
       {errorMsg && <div className={styles.alertError}>{errorMsg}</div>}
 
-      {/* BOOKING REQUESTS */}
       {bookingRequests.length > 0 && (
         <div className={styles.requestsSection}>
           <h2 className={styles.subtitle}>Pending Booking Requests ({bookingRequests.length})</h2>
@@ -187,16 +186,10 @@ export default function MyTripsPage() {
                 </div>
 
                 <div className={styles.requestActions}>
-                  <button 
-                    onClick={() => handleAcceptRequest(req.id)} 
-                    className={styles.acceptBtn}
-                  >
+                  <button onClick={() => handleAcceptRequest(req.id)} className={styles.acceptBtn}>
                     <i className="fa-solid fa-check"></i> Accept
                   </button>
-                  <button 
-                    onClick={() => handleRejectRequest(req.id)} 
-                    className={styles.rejectBtn}
-                  >
+                  <button onClick={() => handleRejectRequest(req.id)} className={styles.rejectBtn}>
                     <i className="fa-solid fa-times"></i> Reject
                   </button>
                 </div>
@@ -241,7 +234,13 @@ export default function MyTripsPage() {
                 <div className={styles.details}>
                   <div className={styles.detail}>
                     <i className="fa-solid fa-calendar"></i>
-                    <span>{trip.date ? new Date(trip.date).toLocaleDateString() : 'N/A'}</span>
+                    <span>
+                      {trip.date
+                        ? (trip.date.toDate
+                            ? trip.date.toDate().toLocaleDateString()
+                            : new Date(trip.date).toLocaleDateString())
+                        : "N/A"}
+                    </span>
                   </div>
                   <div className={styles.detail}>
                     <i className="fa-solid fa-box"></i>
@@ -260,7 +259,7 @@ export default function MyTripsPage() {
                 <div className={styles.actions}>
                   <button
                     onClick={() => handleDeleteClick(trip)}
-                    className={trip.status === 'booked' ? styles.deleteBtnDisabled : styles.deleteBtn}
+                    className={trip.status === "booked" ? styles.deleteBtnDisabled : styles.deleteBtn}
                   >
                     Delete
                   </button>
