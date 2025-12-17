@@ -46,7 +46,7 @@ export async function getUserProfile(userId) {
       return { id: docSnap.id, ...docSnap.data() };
     }
     return null;
-  } catch {
+  } catch (error) {
     return null;
   }
 }
@@ -59,7 +59,7 @@ export async function setUserProfile(userId, profileData) {
       updatedAt: serverTimestamp()
     });
     return true;
-  } catch {
+  } catch (error) {
     return false;
   }
 }
@@ -67,29 +67,58 @@ export async function setUserProfile(userId, profileData) {
 export const uploadProfileImage = async (userId, file) => {
   const storageRef = ref(storage, `profile_images/${userId}`);
   await uploadBytes(storageRef, file);
-  return await getDownloadURL(storageRef);
+  const downloadURL = await getDownloadURL(storageRef);
+  return downloadURL;
 };
 
 export const updateUserProfile = setUserProfile;
 
 export const getUserTrips = async (userId) => {
-  const q = query(
-    collection(db, "trips"),
-    where("carrierUid", "==", userId),
-    orderBy("createdAt", "desc")
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({
-    id: d.id,
-    ...d.data(),
-    date: d.data().date?.toDate ? d.data().date.toDate() : new Date(d.data().date)
-  }));
+  try {
+    const q = query(
+      collection(db, "trips"),
+      where("carrierUid", "==", userId),
+      orderBy("createdAt", "desc")
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      date: d.data().date?.toDate ? d.data().date.toDate() : new Date(d.data().date)
+    }));
+  } catch {
+    return [];
+  }
 };
 
 export const getUserOrders = async (userId) => {
-  const q = query(collection(db, "trips"), where("bookedByUid", "==", userId));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  try {
+    const q = query(collection(db, "trips"), where("bookedByUid", "==", userId));
+    const snap = await getDocs(q);
+    const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    return orders.sort((a, b) => {
+      const dateA = a.bookedAt?.toDate ? a.bookedAt.toDate() : new Date(a.bookedAt || 0);
+      const dateB = b.bookedAt?.toDate ? b.bookedAt.toDate() : new Date(b.bookedAt || 0);
+      return dateB - dateA;
+    });
+  } catch {
+    return [];
+  }
+};
+
+export const getUserReviews = async (userId) => {
+  try {
+    const q = query(collection(db, "reviews"), where("targetUid", "==", userId));
+    const snap = await getDocs(q);
+    const reviews = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      createdAt: d.data().createdAt?.toDate()
+    }));
+    return reviews.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  } catch {
+    return [];
+  }
 };
 
 export const postTrip = async ({ from, to, date, transportType, packageSize, price, description = "" }) => {
@@ -114,6 +143,7 @@ export const postTrip = async ({ from, to, date, transportType, packageSize, pri
 };
 
 export const deleteTrip = async (tripId) => {
+  if (!auth.currentUser) throw new Error("Login required");
   await deleteDoc(doc(db, "trips", tripId));
 };
 
@@ -226,6 +256,18 @@ export const listenToMyBookingRequests = (callback) => {
   });
 };
 
+export const listenToMyBookingRequestStatus = (tripId, callback) => {
+  if (!auth.currentUser) return () => {};
+  const q = query(
+    collection(db, "booking_requests"),
+    where("tripId", "==", tripId),
+    where("shipperId", "==", auth.currentUser.uid)
+  );
+  return onSnapshot(q, snap => {
+    callback(snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() });
+  });
+};
+
 export const listenToMySentRequests = (callback) => {
   if (!auth.currentUser) return () => {};
   const q = query(
@@ -266,10 +308,10 @@ export const listenToMyBookings = (callback) => {
         return {
           ...trip,
           bookingRequestId: req?.id || null,
-          weight: req?.weight ?? null,
-          reward: req?.reward ?? null,
-          pickupLocation: req?.pickupLocation ?? null,
-          dropoffLocation: req?.dropoffLocation ?? null
+          weight: req?.weight ?? trip.weight ?? null,
+          pickupLocation: req?.pickupLocation ?? trip.pickupLocation ?? null,
+          dropoffLocation: req?.dropoffLocation ?? trip.dropoffLocation ?? null,
+          reward: req?.reward ?? trip.reward ?? null
         };
       })
     );
@@ -279,6 +321,7 @@ export const listenToMyBookings = (callback) => {
 };
 
 export const createNotification = async ({ userId, title, message, link }) => {
+  if (!auth.currentUser) return;
   await addDoc(collection(db, "notifications"), {
     userId,
     title,
@@ -302,9 +345,7 @@ export const listenToNotifications = (callback) => {
 };
 
 export const markNotificationRead = async (id) => {
-  await updateDoc(doc(db, "notifications", id), {
-    isRead: true
-  });
+  await updateDoc(doc(db, "notifications", id), { isRead: true });
 };
 
 let currentTripId = null;
@@ -330,5 +371,26 @@ export const listenToTripChat = (callback) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 };
+
+export const listenToTripLastMessage = (tripId, callback) => {
+  const q = query(
+    collection(db, "trips", tripId, "messages"),
+    orderBy("sentAt", "desc"),
+    limit(1)
+  );
+  return onSnapshot(q, snap => {
+    callback(snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() });
+  });
+};
+
+export async function getConversations(userId) {
+  const q = query(
+    collection(db, "conversations"),
+    where("participants", "array-contains", userId),
+    orderBy("lastMessageAt", "desc")
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
 
 console.log("CarryConnect db.js loaded");
