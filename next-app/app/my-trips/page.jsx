@@ -10,6 +10,7 @@ export default function MyTripsPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [trips, setTrips] = useState([]);
+  const [bookingRequests, setBookingRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [successMsg, setSuccessMsg] = useState("");
@@ -19,9 +20,10 @@ export default function MyTripsPage() {
   const [tripToDelete, setTripToDelete] = useState(null);
 
   useEffect(() => {
-    let unsubscribe = () => { };
+    let unsubscribeTrips = () => {};
+    let unsubscribeRequests = () => {};
 
-    async function loadUserTrips() {
+    async function loadData() {
       try {
         const { getCurrentUser } = await import("../../lib/auth");
         const currentUser = await getCurrentUser();
@@ -33,19 +35,31 @@ export default function MyTripsPage() {
 
         setUser(currentUser);
 
-        const { listenToMyTrips } = await import("../../lib/db");
-        unsubscribe = listenToMyTrips((userTrips) => {
+        const {
+          listenToMyTrips,
+          listenToMyBookingRequests
+        } = await import("../../lib/db");
+
+        unsubscribeTrips = listenToMyTrips((userTrips) => {
           setTrips(userTrips);
           setLoading(false);
         });
+
+        unsubscribeRequests = listenToMyBookingRequests((requests) => {
+          setBookingRequests(requests);
+        });
+
       } catch (error) {
-        console.error("Error loading trips:", error);
+        console.error("Error loading data:", error);
         setLoading(false);
       }
     }
 
-    loadUserTrips();
-    return () => unsubscribe();
+    loadData();
+    return () => {
+      unsubscribeTrips();
+      unsubscribeRequests();
+    };
   }, [router]);
 
   const handleDeleteClick = (trip) => {
@@ -77,7 +91,6 @@ export default function MyTripsPage() {
     try {
       const { deleteTrip } = await import("../../lib/db");
       await deleteTrip(tripToDelete);
-      // setTrips is handled by the listener automatically
       setSuccessMsg("Trip deleted successfully!");
       setTimeout(() => setSuccessMsg(""), 3000);
     } catch (error) {
@@ -86,6 +99,32 @@ export default function MyTripsPage() {
       setTimeout(() => setErrorMsg(""), 3000);
     } finally {
       setTripToDelete(null);
+    }
+  };
+
+  const handleAcceptRequest = async (requestId) => {
+    try {
+      const { acceptBookingRequest } = await import("../../lib/db");
+      await acceptBookingRequest(requestId);
+      setSuccessMsg("Booking request accepted!");
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (error) {
+      console.error("Accept error:", error);
+      setErrorMsg("Failed to accept booking request");
+      setTimeout(() => setErrorMsg(""), 3000);
+    }
+  };
+
+  const handleRejectRequest = async (requestId) => {
+    try {
+      const { rejectBookingRequest } = await import("../../lib/db");
+      await rejectBookingRequest(requestId);
+      setSuccessMsg("Booking request rejected");
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (error) {
+      console.error("Reject error:", error);
+      setErrorMsg("Failed to reject booking request");
+      setTimeout(() => setErrorMsg(""), 3000);
     }
   };
 
@@ -106,14 +145,29 @@ export default function MyTripsPage() {
         </Link>
       </div>
 
-      {successMsg && (
-        <div className={styles.alertSuccess}>
-          {successMsg}
-        </div>
-      )}
-      {errorMsg && (
-        <div className={styles.alertError}>
-          {errorMsg}
+      {successMsg && <div className={styles.alertSuccess}>{successMsg}</div>}
+      {errorMsg && <div className={styles.alertError}>{errorMsg}</div>}
+
+      {/* BOOKING REQUESTS */}
+      {bookingRequests.length > 0 && (
+        <div className={styles.requestsSection}>
+          <h2 className={styles.subtitle}>Booking Requests</h2>
+          {bookingRequests.map(req => (
+            <div key={req.id} className={styles.requestCard}>
+              <p><strong>From:</strong> {req.shipperName}</p>
+              <p><strong>Pickup:</strong> {req.pickupLocation}</p>
+              <p><strong>Dropoff:</strong> {req.dropoffLocation}</p>
+              <p><strong>Offer:</strong> ${req.reward}</p>
+              <div className={styles.requestActions}>
+                <button onClick={() => handleAcceptRequest(req.id)} className={styles.acceptBtn}>
+                  Accept
+                </button>
+                <button onClick={() => handleRejectRequest(req.id)} className={styles.rejectBtn}>
+                  Reject
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -170,7 +224,6 @@ export default function MyTripsPage() {
                 <button
                   onClick={() => handleDeleteClick(trip)}
                   className={trip.status === 'booked' ? styles.deleteBtnDisabled : styles.deleteBtn}
-                  title={trip.status === 'booked' ? "Cannot delete booked trip" : "Delete trip"}
                 >
                   Delete
                 </button>
@@ -179,7 +232,6 @@ export default function MyTripsPage() {
           ))}
         </div>
       )}
-
 
       <ConfirmationModal
         isOpen={isModalOpen}
