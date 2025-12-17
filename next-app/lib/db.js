@@ -148,7 +148,7 @@ export const postTrip = async ({ from, to, date, transportType, packageSize, pri
   const tripRef = await addDoc(collection(db, "trips"), {
     from,
     to,
-    date: new Date(date),
+    date: new Date(`${date}T00:00:00`),
     transportType,
     packageSize,
     price: Number(price),
