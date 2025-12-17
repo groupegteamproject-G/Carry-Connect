@@ -15,6 +15,7 @@ function BookingContent() {
     const [submitting, setSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
     const [successMsg, setSuccessMsg] = useState("");
+    const [requestStatus, setRequestStatus] = useState(null); // NEW: Track request status
 
     const [formData, setFormData] = useState({
         weight: "",
@@ -38,10 +39,9 @@ function BookingContent() {
                     setUser(currentUser);
                 }
 
-                // Check for pending booking data
                 const pendingData = sessionStorage.getItem(`pendingBooking_${tripId}`);
 
-                const { getTrip } = await import("../../lib/db");
+                const { getTrip, listenToMyBookingRequestStatus } = await import("../../lib/db");
                 const tripData = await getTrip(tripId);
 
                 if (!tripData) {
@@ -51,8 +51,15 @@ function BookingContent() {
                     if (pendingData) {
                         setFormData(JSON.parse(pendingData));
                     } else {
-                        // Only set default reward if no pending data
                         setFormData(prev => ({ ...prev, reward: tripData.price }));
+                    }
+
+                    // NEW: Listen to booking request status
+                    if (currentUser) {
+                        const unsubscribe = listenToMyBookingRequestStatus(tripId, (request) => {
+                            setRequestStatus(request);
+                        });
+                        return () => unsubscribe();
                     }
                 }
             } catch (error) {
@@ -76,7 +83,6 @@ function BookingContent() {
         e.preventDefault();
 
         if (!user) {
-            // Save data and redirect to login
             sessionStorage.setItem(`pendingBooking_${tripId}`, JSON.stringify(formData));
             router.push(`/auth?redirect=/booking?tripId=${tripId}`);
             return;
@@ -87,17 +93,18 @@ function BookingContent() {
         setSuccessMsg("");
 
         try {
-            const { bookTrip } = await import("../../lib/db");
-            await bookTrip(tripId, formData);
+            // NEW: Use submitBookingRequest instead of bookTrip
+            const { submitBookingRequest } = await import("../../lib/db");
+            await submitBookingRequest(tripId, formData);
 
-            setSuccessMsg("Booking request sent successfully!");
-            sessionStorage.removeItem(`pendingBooking_${tripId}`); // Clear pending data
+            setSuccessMsg("Booking request sent! Wait for carrier to accept.");
+            sessionStorage.removeItem(`pendingBooking_${tripId}`);
             setTimeout(() => {
-                router.push("/my-trips");
+                router.push("/my-orders");
             }, 2000);
         } catch (error) {
             console.error("Booking error:", error);
-            setErrorMsg("Failed to book trip: " + error.message);
+            setErrorMsg("Failed to send booking request: " + error.message);
             setSubmitting(false);
         }
     };
@@ -114,6 +121,48 @@ function BookingContent() {
                     <button onClick={() => router.push("/find-a-carrier")} className={styles.backBtn}>
                         Back to Search
                     </button>
+                </div>
+            </div>
+        );
+    }
+
+    // NEW: Show message if already requested
+    if (requestStatus) {
+        return (
+            <div className={styles.container}>
+                <div className={styles.content}>
+                    <h1 className={styles.title}>Booking Request Status</h1>
+                    <div className={styles.tripCard}>
+                        <div className={styles.route}>
+                            <div className={styles.location}>
+                                <span className={styles.label}>From</span>
+                                <span className={styles.city}>{trip.from}</span>
+                            </div>
+                            <div className={styles.arrow}>→</div>
+                            <div className={styles.location}>
+                                <span className={styles.label}>To</span>
+                                <span className={styles.city}>{trip.to}</span>
+                            </div>
+                        </div>
+
+                        <div style={{ marginTop: "30px", padding: "20px", backgroundColor: "#f0f0f0", borderRadius: "8px" }}>
+                            <p><strong>Status:</strong> {requestStatus.status.toUpperCase()}</p>
+                            <p><strong>Sent:</strong> {new Date(requestStatus.createdAt).toLocaleString()}</p>
+                            {requestStatus.status === "pending" && (
+                                <p style={{ color: "#ff9800" }}>⏳ Waiting for carrier to accept...</p>
+                            )}
+                            {requestStatus.status === "accepted" && (
+                                <p style={{ color: "#4caf50" }}>✅ Carrier accepted! Check messages.</p>
+                            )}
+                            {requestStatus.status === "rejected" && (
+                                <p style={{ color: "#f44336" }}>❌ Carrier rejected. Try another trip.</p>
+                            )}
+                        </div>
+
+                        <button onClick={() => router.push("/my-orders")} className={styles.backBtn} style={{ marginTop: "20px" }}>
+                            Back to My Orders
+                        </button>
+                    </div>
                 </div>
             </div>
         );
@@ -226,7 +275,7 @@ function BookingContent() {
                             className={styles.submitBtn}
                             disabled={submitting}
                         >
-                            {submitting ? "Processing..." : (user ? "Confirm Booking" : "Login to Book")}
+                            {submitting ? "Sending Request..." : (user ? "Send Booking Request" : "Login to Book")}
                         </button>
                     </form>
                 </div>
