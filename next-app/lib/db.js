@@ -294,6 +294,19 @@ export const listenToMyBookingRequestStatus = (tripId, callback) => {
   });
 };
 
+// ADDED: Listen to sent booking requests (for My Orders page)
+export const listenToMySentRequests = (callback) => {
+  if (!auth.currentUser) return () => {};
+  const q = query(
+    collection(db, "booking_requests"),
+    where("shipperId", "==", auth.currentUser.uid),
+    orderBy("createdAt", "desc")
+  );
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+};
+
 // ==========================
 // MESSAGING (UNCHANGED)
 // ==========================
