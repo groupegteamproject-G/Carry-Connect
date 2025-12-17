@@ -10,8 +10,7 @@ export default function Navbar() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [hasUnread, setHasUnread] = useState(false)
-  const [notifications, setNotifications] = useState([])
-  const [showNotif, setShowNotif] = useState(false)
+  const [trackedTripIds, setTrackedTripIds] = useState([])
 
   useEffect(() => {
     async function checkAuth() {
@@ -32,13 +31,16 @@ export default function Navbar() {
   useEffect(() => {
     if (!user) {
       setHasUnread(false)
+      setTrackedTripIds([])
       return
     }
 
     let mounted = true
     let unsubs = []
+    const unreadMap = {}
 
     const getSeenKey = (uid, tripId) => `cc_seen_${uid}_${tripId}`
+
     const getLastSeen = (uid, tripId) => {
       try {
         const raw = localStorage.getItem(getSeenKey(uid, tripId))
@@ -48,6 +50,21 @@ export default function Navbar() {
       }
     }
 
+    const toMillis = (ts) => {
+      if (!ts) return 0
+      if (typeof ts === "number") return ts
+      if (ts?.toMillis) return ts.toMillis()
+      if (ts?.toDate) return ts.toDate().getTime()
+      const d = new Date(ts)
+      const t = d.getTime()
+      return Number.isFinite(t) ? t : 0
+    }
+
+    const recomputeHasUnread = () => {
+      const anyUnread = Object.values(unreadMap).some(Boolean)
+      setHasUnread(anyUnread)
+    }
+
     async function initUnread() {
       try {
         const { getUserTrips, getUserOrders, listenToTripLastMessage } =
@@ -55,22 +72,40 @@ export default function Navbar() {
 
         const postedTrips = await getUserTrips(user.uid)
         const bookedOrders = await getUserOrders(user.uid)
+
         const trips = [...postedTrips, ...bookedOrders].filter(
           (t) => t.status === "booked"
         )
 
         const uniqueTripIds = Array.from(new Set(trips.map((t) => t.id)))
+        setTrackedTripIds(uniqueTripIds)
 
         unsubs = uniqueTripIds.map((tripId) =>
           listenToTripLastMessage(tripId, (msg) => {
             if (!mounted) return
-            if (!msg || msg.senderUid === user.uid) return
+
+            if (!msg) {
+              unreadMap[tripId] = false
+              recomputeHasUnread()
+              return
+            }
+
+            const msgTime = toMillis(msg.sentAt)
             const lastSeen = getLastSeen(user.uid, tripId)
-            const msgTime = new Date(msg.sentAt).getTime()
-            if (msgTime > lastSeen) setHasUnread(true)
+
+            if (msg.senderUid && msg.senderUid !== user.uid && msgTime > lastSeen) {
+              unreadMap[tripId] = true
+            } else {
+              unreadMap[tripId] = false
+            }
+
+            recomputeHasUnread()
           })
         )
-      } catch {}
+      } catch {
+        setHasUnread(false)
+        setTrackedTripIds([])
+      }
     }
 
     initUnread()
@@ -80,35 +115,22 @@ export default function Navbar() {
     }
   }, [user])
 
-  useEffect(() => {
-    if (!user) return
-
-    let unsub = () => {}
-
-    async function initNotifications() {
-      const { listenToNotifications } = await import("../../lib/db")
-      unsub = listenToNotifications((data) => {
-        setNotifications(data)
-      })
-    }
-
-    initNotifications()
-    return () => unsub()
-  }, [user])
-
-  const unreadNotifCount = notifications.filter(n => !n.isRead).length
-
-  const handleNotificationClick = async (notif) => {
-    const { markNotificationRead } = await import("../../lib/db")
-    await markNotificationRead(notif.id)
-    setShowNotif(false)
-    router.push(notif.link)
-  }
-
   const handleLogout = async () => {
     const { logOut } = await import("../../lib/auth")
     await logOut()
     router.push("/")
+  }
+
+  const handleOpenMessages = (e) => {
+    if (!user) return
+    try {
+      const now = Date.now()
+      trackedTripIds.forEach((tripId) => {
+        localStorage.setItem(`cc_seen_${user.uid}_${tripId}`, String(now))
+      })
+    } catch {}
+    setHasUnread(false)
+    router.push("/messages")
   }
 
   return (
@@ -137,40 +159,21 @@ export default function Navbar() {
         <div className="navbar-right">
           {user ? (
             <>
-              <div className="icon-wrap cc-iconBtn" onClick={() => setShowNotif(!showNotif)}>
-                <i className="fa-regular fa-bell icon"></i>
-                {unreadNotifCount > 0 && <span className="icon-badge"></span>}
-              </div>
-
-              {showNotif && (
-                <div className="cc-notifDropdown">
-                  {notifications.length === 0 ? (
-                    <div className="cc-notifEmpty">No notifications</div>
-                  ) : (
-                    notifications.slice(0, 5).map((n) => (
-                      <div
-                        key={n.id}
-                        className={`cc-notifItem ${n.isRead ? "" : "unread"}`}
-                        onClick={() => handleNotificationClick(n)}
-                      >
-                        <strong>{n.title}</strong>
-                        <p>{n.message}</p>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-
-              <Link href="/messages" className="icon-wrap cc-iconBtn">
+              <button
+                type="button"
+                onClick={handleOpenMessages}
+                className="icon-wrap cc-iconBtn"
+                style={{ border: "none", background: "transparent" }}
+              >
                 <i className="fa-regular fa-comments icon"></i>
                 {hasUnread && <span className="icon-badge"></span>}
-              </Link>
+              </button>
 
               <Link href="/profile" className="icon-wrap cc-iconBtn">
                 <i className="fa-regular fa-user icon"></i>
               </Link>
 
-              <button onClick={handleLogout} className="add-trip-btn" style={{background: '#ef4444'}}>
+              <button onClick={handleLogout} className="add-trip-btn" style={{ background: "#ef4444" }}>
                 Logout
               </button>
             </>
