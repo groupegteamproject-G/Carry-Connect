@@ -24,82 +24,165 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, auth, storage } from "./firebase";
 
-// Re-export auth and db
 export { auth, db };
 
-// Authentication Functions
-export const signUp = (email, password) => createUserWithEmailAndPassword(auth, email, password);
-export const signIn = (email, password) => signInWithEmailAndPassword(auth, email, password);
-export const logOut = () => signOut(auth);
-export const onAuthChange = (callback) => onAuthStateChanged(auth, callback);
+// =======================
+// AUTH
+// =======================
 
-// User Profile Management
+export const signUp = (email, password) =>
+  createUserWithEmailAndPassword(auth, email, password);
+
+export const signIn = (email, password) =>
+  signInWithEmailAndPassword(auth, email, password);
+
+export const logOut = () => signOut(auth);
+
+export const onAuthChange = (callback) =>
+  onAuthStateChanged(auth, callback);
+
+// =======================
+// USER PROFILES
+// =======================
+
 export const saveUserProfile = async (name, phone) => {
   if (!auth.currentUser) return;
   await updateDoc(doc(db, "users", auth.currentUser.uid), {
-    name, phone, email: auth.currentUser.email, createdAt: serverTimestamp()
+    name,
+    phone,
+    email: auth.currentUser.email,
+    createdAt: serverTimestamp()
   });
 };
 
 export async function getUserProfile(userId) {
-  try {
-    const docRef = doc(db, 'users', userId);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() };
-    }
-    return null;
-  } catch (error) {
-    console.error('Error getting user profile:', error);
-    return null;
-  }
+  const docSnap = await getDoc(doc(db, "users", userId));
+  return docSnap.exists()
+    ? { id: docSnap.id, ...docSnap.data() }
+    : null;
 }
 
 export async function setUserProfile(userId, profileData) {
-  try {
-    const docRef = doc(db, 'users', userId);
-    await updateDoc(docRef, {
-      ...profileData,
-      updatedAt: serverTimestamp()
-    });
-    return true;
-  } catch (error) {
-    console.error('Error setting user profile:', error);
-    return false;
-  }
+  await updateDoc(doc(db, "users", userId), {
+    ...profileData,
+    updatedAt: serverTimestamp()
+  });
+  return true;
 }
-
-export const uploadProfileImage = async (userId, file) => {
-  try {
-    const storageRef = ref(storage, `profile_images/${userId}`);
-    await uploadBytes(storageRef, file);
-    const downloadURL = await getDownloadURL(storageRef);
-    return downloadURL;
-  } catch (error) {
-    console.error("Error uploading profile image:", error);
-    throw error;
-  }
-};
 
 export const updateUserProfile = setUserProfile;
 
-// ===============================
-// BOOKING REQUEST SYSTEM (ADDED)
-// ===============================
+export const uploadProfileImage = async (userId, file) => {
+  const storageRef = ref(storage, `profile_images/${userId}`);
+  await uploadBytes(storageRef, file);
+  return await getDownloadURL(storageRef);
+};
 
-// 1. Shipper submits booking request
-export const submitBookingRequest = async (tripId, { weight, pickupLocation, dropoffLocation, reward }) => {
+// =======================
+// TRIPS
+// =======================
+
+export const postTrip = async ({
+  from,
+  to,
+  date,
+  transportType,
+  packageSize,
+  price,
+  description = ""
+}) => {
+  if (!auth.currentUser) throw new Error("Login required");
+
+  const tripRef = await addDoc(collection(db, "trips"), {
+    from,
+    to,
+    date: new Date(date),
+    transportType,
+    packageSize,
+    price: Number(price),
+    description,
+    carrierUid: auth.currentUser.uid,
+    carrierEmail: auth.currentUser.email,
+    carrierName: auth.currentUser.displayName || auth.currentUser.email,
+    status: "available",
+    createdAt: serverTimestamp()
+  });
+
+  return tripRef.id;
+};
+
+export const deleteTrip = async (tripId) => {
+  if (!auth.currentUser) throw new Error("Login required");
+  await deleteDoc(doc(db, "trips", tripId));
+};
+
+export const getTrip = async (tripId) => {
+  const docSnap = await getDoc(doc(db, "trips", tripId));
+  if (!docSnap.exists()) return null;
+  const data = docSnap.data();
+  return {
+    id: docSnap.id,
+    ...data,
+    date: data.date?.toDate ? data.date.toDate() : new Date(data.date)
+  };
+};
+
+export const getUserTrips = async (userId) => {
+  const q = query(
+    collection(db, "trips"),
+    where("carrierUid", "==", userId),
+    orderBy("createdAt", "desc")
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+};
+
+export const getUserOrders = async (userId) => {
+  const q = query(
+    collection(db, "trips"),
+    where("bookedByUid", "==", userId)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+};
+
+export const listenToAvailableTrips = (callback) => {
+  const q = query(collection(db, "trips"), where("status", "==", "available"));
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+};
+
+export const listenToMyTrips = (callback) => {
+  if (!auth.currentUser) return () => {};
+  const q = query(
+    collection(db, "trips"),
+    where("carrierUid", "==", auth.currentUser.uid),
+    orderBy("createdAt", "desc")
+  );
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+};
+
+// =======================
+// BOOKING REQUEST SYSTEM
+// =======================
+
+export const submitBookingRequest = async (
+  tripId,
+  { weight, pickupLocation, dropoffLocation, reward }
+) => {
   const user = auth.currentUser;
   if (!user) throw new Error("Login required");
 
-  const tripRef = doc(db, "trips", tripId);
-  const tripDoc = await getDoc(tripRef);
+  const tripDoc = await getDoc(doc(db, "trips", tripId));
   if (!tripDoc.exists()) throw new Error("Trip not found");
 
   const tripData = tripDoc.data();
   if (tripData.status === "booked") throw new Error("Trip already booked");
 
-  const requestRef = await addDoc(collection(db, "booking_requests"), {
+  const reqRef = await addDoc(collection(db, "booking_requests"), {
     tripId,
     shipperId: user.uid,
     shipperEmail: user.email,
@@ -114,10 +197,9 @@ export const submitBookingRequest = async (tripId, { weight, pickupLocation, dro
     respondedAt: null
   });
 
-  return requestRef.id;
+  return reqRef.id;
 };
 
-// 2. Carrier accepts booking request
 export const acceptBookingRequest = async (requestId) => {
   const user = auth.currentUser;
   if (!user) throw new Error("Login required");
@@ -126,42 +208,41 @@ export const acceptBookingRequest = async (requestId) => {
   const requestDoc = await getDoc(requestRef);
   if (!requestDoc.exists()) throw new Error("Request not found");
 
-  const requestData = requestDoc.data();
-  if (requestData.carrierUid !== user.uid) throw new Error("Not authorized");
+  const request = requestDoc.data();
+  if (request.carrierUid !== user.uid) throw new Error("Not authorized");
 
-  await runTransaction(db, async (transaction) => {
-    const tripRef = doc(db, "trips", requestData.tripId);
-    const tripDoc = await transaction.get(tripRef);
-    if (!tripDoc.exists()) throw new Error("Trip not found");
-    if (tripDoc.data().status !== "available") throw new Error("Trip not available");
+  await runTransaction(db, async (tx) => {
+    const tripRef = doc(db, "trips", request.tripId);
+    const tripDoc = await tx.get(tripRef);
+    if (tripDoc.data().status !== "available") throw new Error("Not available");
 
-    transaction.update(tripRef, {
+    tx.update(tripRef, {
       status: "booked",
-      bookedByUid: requestData.shipperId,
-      bookedByEmail: requestData.shipperEmail,
-      weight: requestData.weight,
-      pickupLocation: requestData.pickupLocation,
-      dropoffLocation: requestData.dropoffLocation,
-      reward: requestData.reward,
+      bookedByUid: request.shipperId,
+      bookedByEmail: request.shipperEmail,
+      weight: request.weight,
+      pickupLocation: request.pickupLocation,
+      dropoffLocation: request.dropoffLocation,
+      reward: request.reward,
       bookedAt: serverTimestamp()
     });
 
-    transaction.update(requestRef, {
+    tx.update(requestRef, {
       status: "accepted",
       respondedAt: serverTimestamp()
     });
 
-    const otherRequests = await getDocs(
+    const others = await getDocs(
       query(
         collection(db, "booking_requests"),
-        where("tripId", "==", requestData.tripId),
+        where("tripId", "==", request.tripId),
         where("status", "==", "pending")
       )
     );
 
-    otherRequests.forEach((docSnap) => {
-      if (docSnap.id !== requestId) {
-        transaction.update(docSnap.ref, {
+    others.forEach(d => {
+      if (d.id !== requestId) {
+        tx.update(d.ref, {
           status: "rejected",
           respondedAt: serverTimestamp()
         });
@@ -170,66 +251,74 @@ export const acceptBookingRequest = async (requestId) => {
   });
 };
 
-// 3. Carrier rejects booking request
 export const rejectBookingRequest = async (requestId) => {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Login required");
-
-  const requestRef = doc(db, "booking_requests", requestId);
-  const requestDoc = await getDoc(requestRef);
-  if (!requestDoc.exists()) throw new Error("Request not found");
-
-  const requestData = requestDoc.data();
-  if (requestData.carrierUid !== user.uid) throw new Error("Not authorized");
-
-  await updateDoc(requestRef, {
+  await updateDoc(doc(db, "booking_requests", requestId), {
     status: "rejected",
     respondedAt: serverTimestamp()
   });
 };
 
-// 4. Carrier listens to pending requests
 export const listenToMyBookingRequests = (callback) => {
-  if (!auth.currentUser) return () => { };
-
+  if (!auth.currentUser) return () => {};
   const q = query(
     collection(db, "booking_requests"),
     where("carrierUid", "==", auth.currentUser.uid),
     where("status", "==", "pending"),
     orderBy("createdAt", "desc")
   );
-
-  return onSnapshot(q, (snap) => {
-    const requests = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-      createdAt: d.data().createdAt?.toDate()
-    }));
-    callback(requests);
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 };
 
-// 5. Shipper listens to request status
 export const listenToMyBookingRequestStatus = (tripId, callback) => {
-  if (!auth.currentUser) return () => { };
-
+  if (!auth.currentUser) return () => {};
   const q = query(
     collection(db, "booking_requests"),
     where("tripId", "==", tripId),
     where("shipperId", "==", auth.currentUser.uid)
   );
+  return onSnapshot(q, snap => {
+    callback(snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() });
+  });
+};
 
-  return onSnapshot(q, (snap) => {
-    if (snap.empty) {
-      callback(null);
-      return;
-    }
-    const d = snap.docs[0];
-    callback({
-      id: d.id,
-      ...d.data(),
-      createdAt: d.data().createdAt?.toDate()
-    });
+// =======================
+// MESSAGING (RESTORED)
+// =======================
+
+let currentTripId = null;
+export const setCurrentTripId = (id) => (currentTripId = id);
+
+export const sendTripMessage = async (text) => {
+  if (!currentTripId || !auth.currentUser) return;
+  await addDoc(collection(db, "trips", currentTripId, "messages"), {
+    text,
+    sender: auth.currentUser.displayName || auth.currentUser.email,
+    senderUid: auth.currentUser.uid,
+    sentAt: serverTimestamp()
+  });
+};
+
+export const listenToTripChat = (callback) => {
+  if (!currentTripId) return () => {};
+  const q = query(
+    collection(db, "trips", currentTripId, "messages"),
+    orderBy("sentAt", "asc")
+  );
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+};
+
+export const listenToTripLastMessage = (tripId, callback) => {
+  const q = query(
+    collection(db, "trips", tripId, "messages"),
+    orderBy("sentAt", "desc"),
+    limit(1)
+  );
+  return onSnapshot(q, snap => {
+    callback(snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() });
   });
 };
 
