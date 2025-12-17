@@ -244,21 +244,37 @@ export const acceptBookingRequest = async (requestId) => {
         });
       });
   });
+
   await addDoc(collection(db, "notifications"), {
-  userId: request.shipperId,
-  title: "Booking accepted",
-  message: "Your booking request was accepted",
-  link: "/my-orders",
-  isRead: false,
-  createdAt: serverTimestamp()
-});
+    userId: request.shipperId,
+    title: "Booking accepted",
+    message: "Your booking request was accepted",
+    link: "/my-orders",
+    isRead: false,
+    createdAt: serverTimestamp()
+  });
 };
 
 export const rejectBookingRequest = async (requestId) => {
-  await updateDoc(doc(db, "booking_requests", requestId), {
+  const requestRef = doc(db, "booking_requests", requestId);
+  const requestDoc = await getDoc(requestRef);
+  const request = requestDoc.exists() ? requestDoc.data() : null;
+
+  await updateDoc(requestRef, {
     status: "rejected",
     respondedAt: serverTimestamp()
   });
+
+  if (request?.shipperId) {
+    await addDoc(collection(db, "notifications"), {
+      userId: request.shipperId,
+      title: "Booking rejected",
+      message: "Your booking request was rejected",
+      link: "/my-orders",
+      isRead: false,
+      createdAt: serverTimestamp()
+    });
+  }
 };
 
 export const listenToMyBookingRequests = (callback) => {
