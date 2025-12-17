@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import styles from "./my-orders.module.css";
+import { auth, listenToUserOrders } from "../../lib/db";
+import styles from "./myorders.module.css";
 
 export default function MyOrdersPage() {
     const router = useRouter();
@@ -10,48 +11,35 @@ export default function MyOrdersPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        let unsubscribe;
+        const user = auth.currentUser;
 
-        async function init() {
-            try {
-                const { onAuthChange } = await import("../../lib/auth");
-                const { listenToMyBookings } = await import("../../lib/db");
-
-                onAuthChange((user) => {
-                    if (!user) {
-                        router.push("/auth");
-                        return;
-                    }
-
-                    unsubscribe = listenToMyBookings((bookings) => {
-                        setOrders(bookings);
-                        setLoading(false);
-                    });
-                });
-            } catch (error) {
-                console.error("Error initializing orders:", error);
-                setLoading(false);
-            }
+        if (!user) {
+            router.push("/auth");
+            return;
         }
 
-        init();
-        return () => {
-            if (unsubscribe) unsubscribe();
-        };
+        const unsubscribe = listenToUserOrders(user.uid, (userOrders) => {
+            setOrders(userOrders);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
     }, [router]);
 
-    if (loading) {
-        return <div style={{ padding: "50px", textAlign: "center" }}>Loading your orders...</div>;
-    }
-
     return (
-        <main className={styles.page}>
-            <div className={styles.headerBg}></div>
+        <main className={styles.container}>
+            <header className={styles.header}>
+                <h1>My Orders</h1>
+                <p>Track the trips you have booked and their status</p>
+            </header>
 
-            <div className={styles.container}>
-                <h1 className={styles.pageTitle}>My Orders</h1>
-
-                {orders.length === 0 ? (
+            <div className={styles.content}>
+                {loading ? (
+                    <div className={styles.loading}>
+                        <div className={styles.spinner}></div>
+                        <p>Loading your orders...</p>
+                    </div>
+                ) : orders.length === 0 ? (
                     <div className={styles.emptyState}>
                         <i className="fa-solid fa-box-open"></i>
                         <h3>No orders yet</h3>
@@ -77,24 +65,15 @@ function OrderCard({ order }) {
 
     return (
         <div className={styles.orderCard}>
-            <div className={styles.orderInfo}>
-                <h3>{order.description || "Package Delivery"}</h3>
-
-                <div className={styles.route}>
-                    <span>{order.from}</span>
-                    <i className="fa-solid fa-arrow-right arrow"></i>
-                    <span>{order.to}</span>
+            <div className={styles.orderHeader}>
+                <div>
+                    <h3>{order.from} → {order.to}</h3>
+                    <p className={styles.date}>{order.date}</p>
+                    <p className={styles.transport}>{order.transportType}</p>
                 </div>
-
-                <div className={styles.meta}>
-                    <span>
-                        <i className="fa-regular fa-calendar"></i>
-                        {order.date?.toDate ? order.date.toDate().toLocaleDateString() : new Date(order.date).toLocaleDateString()}
-                    </span>
-                    <span>
-                        <i className="fa-solid fa-weight-hanging"></i>
-                        {order.packageSize}
-                    </span>
+                <div className={styles.carrierInfo}>
+                    <p className={styles.carrierName}>{order.carrierName || "Carrier"}</p>
+                    <p className={styles.carrierEmail}>{order.carrierEmail}</p>
                 </div>
             </div>
 
@@ -114,6 +93,16 @@ function OrderCard({ order }) {
                 >
                     {expanded ? "Hide Details" : "View Details"}
                 </button>
+                <button
+                    className={styles.detailsBtn}
+                    onClick={async () => {
+                        const { cancelBooking } = await import("../../lib/db");
+                        await cancelBooking(order.id);
+                    }}
+                    disabled={order.status !== 'pending' && order.status !== 'accepted'}
+                >
+                    Cancel
+                </button>
             </div>
 
             {expanded && (
@@ -129,21 +118,16 @@ function OrderCard({ order }) {
                     color: '#555'
                 }}>
                     <div>
-                        <p style={{ margin: '0 0 5px', color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Order ID</p>
-                        <p style={{ margin: 0, fontWeight: '500', fontFamily: 'monospace' }}>{order.id}</p>
+                        <p><strong>Available Weight:</strong> {order.availableWeight} kg</p>
+                        <p><strong>Description:</strong> {order.description || "No description"}</p>
                     </div>
                     <div>
-                        <p style={{ margin: '0 0 5px', color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Booked On</p>
-                        <p style={{ margin: 0, fontWeight: '500' }}>{order.bookedAt?.toDate ? order.bookedAt.toDate().toLocaleDateString() : "N/A"}</p>
+                        <p><strong>Pickup:</strong> {order.pickupLocation || "Not specified"}</p>
+                        <p><strong>Dropoff:</strong> {order.dropoffLocation || "Not specified"}</p>
                     </div>
                     <div>
-                        <p style={{ margin: '0 0 5px', color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Carrier</p>
-                        <p style={{ margin: 0, fontWeight: '500' }}>{order.carrierName || "Unknown Carrier"}</p>
-                    </div>
-                    {/* Placeholder for future tracking info */}
-                    <div>
-                        <p style={{ margin: '0 0 5px', color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tracking</p>
-                        <p style={{ margin: 0, fontWeight: '500' }}>Not available</p>
+                        <p><strong>Package Weight:</strong> {order.weight || "Not specified"} kg</p>
+                        <p><strong>Reward:</strong> ${order.reward || "Not specified"}</p>
                     </div>
                 </div>
             )}
