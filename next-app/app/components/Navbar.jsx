@@ -10,6 +10,8 @@ export default function Navbar() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [hasUnread, setHasUnread] = useState(false)
+  const [notifications, setNotifications] = useState([])
+  const [showNotif, setShowNotif] = useState(false)
 
   useEffect(() => {
     async function checkAuth() {
@@ -78,6 +80,31 @@ export default function Navbar() {
     }
   }, [user])
 
+  useEffect(() => {
+    if (!user) return
+
+    let unsub = () => {}
+
+    async function initNotifications() {
+      const { listenToNotifications } = await import("../../lib/db")
+      unsub = listenToNotifications((data) => {
+        setNotifications(data)
+      })
+    }
+
+    initNotifications()
+    return () => unsub()
+  }, [user])
+
+  const unreadNotifCount = notifications.filter(n => !n.isRead).length
+
+  const handleNotificationClick = async (notif) => {
+    const { markNotificationRead } = await import("../../lib/db")
+    await markNotificationRead(notif.id)
+    setShowNotif(false)
+    router.push(notif.link)
+  }
+
   const handleLogout = async () => {
     const { logOut } = await import("../../lib/auth")
     await logOut()
@@ -110,6 +137,30 @@ export default function Navbar() {
         <div className="navbar-right">
           {user ? (
             <>
+              <div className="icon-wrap cc-iconBtn" onClick={() => setShowNotif(!showNotif)}>
+                <i className="fa-regular fa-bell icon"></i>
+                {unreadNotifCount > 0 && <span className="icon-badge"></span>}
+              </div>
+
+              {showNotif && (
+                <div className="cc-notifDropdown">
+                  {notifications.length === 0 ? (
+                    <div className="cc-notifEmpty">No notifications</div>
+                  ) : (
+                    notifications.slice(0, 5).map((n) => (
+                      <div
+                        key={n.id}
+                        className={`cc-notifItem ${n.isRead ? "" : "unread"}`}
+                        onClick={() => handleNotificationClick(n)}
+                      >
+                        <strong>{n.title}</strong>
+                        <p>{n.message}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
               <Link href="/messages" className="icon-wrap cc-iconBtn">
                 <i className="fa-regular fa-comments icon"></i>
                 {hasUnread && <span className="icon-badge"></span>}
@@ -130,7 +181,6 @@ export default function Navbar() {
               </Link>
             )
           )}
-
         </div>
       </nav>
     </>
