@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import styles from "./messages.module.css";
 
 import {
@@ -15,7 +15,6 @@ import {
 } from "../../lib/db";
 
 function MessagesContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [user, setUser] = useState(null);
@@ -37,6 +36,18 @@ function MessagesContent() {
       setSelectedTripId(tripIdFromUrl);
     }
   }, [searchParams, selectedTripId]);
+
+  useEffect(() => {
+    const onPop = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get("tripId");
+        setSelectedTripId(id);
+      } catch {}
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -87,9 +98,9 @@ function MessagesContent() {
     }
   };
 
-  const setLastSeen = (uid, tripId) => {
+  const setLastSeen = (uid, tripId, value = Date.now()) => {
     try {
-      localStorage.setItem(getSeenKey(uid, tripId), Date.now());
+      localStorage.setItem(getSeenKey(uid, tripId), value);
     } catch {}
   };
 
@@ -107,7 +118,14 @@ function MessagesContent() {
                 ? msg.sentAt.toMillis()
                 : 0;
 
+            const isOpenChat = selectedTripId && selectedTripId === chat.tripId;
+
+            if (isOpenChat && msg && msg.senderUid !== user.uid && msgTime) {
+              setLastSeen(user.uid, chat.tripId, msgTime);
+            }
+
             const unread =
+              !isOpenChat &&
               msg &&
               msg.senderUid !== user.uid &&
               msgTime > getLastSeen(user.uid, chat.tripId);
@@ -116,7 +134,7 @@ function MessagesContent() {
               ...c,
               lastMessage: msg?.text || "Tap to open chat...",
               lastMessageAt: msg?.sentAt || null,
-              unread
+              unread: Boolean(unread)
             };
           })
         );
@@ -124,9 +142,8 @@ function MessagesContent() {
     );
 
     return () => unsubs.forEach(u => u && u());
-  }, [user, conversations.length]);
+  }, [user, conversations.length, selectedTripId]);
 
-  // 🔥 FACEBOOK-STYLE FIX: do NOT clear messages
   useEffect(() => {
     if (!selectedTripId) return;
 
@@ -134,11 +151,29 @@ function MessagesContent() {
 
     const unsub = listenToTripChat(msgs => {
       setMessages(msgs);
+
+      if (user) {
+        const lastMsg = msgs && msgs.length ? msgs[msgs.length - 1] : null;
+        const lastTime =
+          lastMsg?.sentAt && typeof lastMsg.sentAt.toMillis === "function"
+            ? lastMsg.sentAt.toMillis()
+            : Date.now();
+
+        setLastSeen(user.uid, selectedTripId, lastTime);
+
+        setConversations(prev =>
+          prev.map(c =>
+            c.tripId === selectedTripId ? { ...c, unread: false } : c
+          )
+        );
+      }
+
       requestAnimationFrame(() => {
-        messagesBoxRef.current?.scrollTo({
-          top: messagesBoxRef.current.scrollHeight,
-          behavior: "smooth"
-        });
+        if (messagesBoxRef.current) {
+          messagesBoxRef.current.scrollTo({
+            top: messagesBoxRef.current.scrollHeight
+          });
+        }
       });
     });
 
@@ -146,12 +181,23 @@ function MessagesContent() {
       unsub();
       setCurrentTripId(null);
     };
-  }, [selectedTripId]);
+  }, [selectedTripId, user]);
 
   const openChat = tripId => {
     if (tripId === selectedTripId) return;
+
     if (user) setLastSeen(user.uid, tripId);
-    router.push(`/messages?tripId=${tripId}`, { scroll: false });
+
+    setSelectedTripId(tripId);
+
+    setConversations(prev =>
+      prev.map(c => (c.tripId === tripId ? { ...c, unread: false } : c))
+    );
+
+    try {
+      const url = `/messages?tripId=${tripId}`;
+      window.history.pushState(null, "", url);
+    } catch {}
   };
 
   const send = () => {
@@ -207,6 +253,7 @@ function MessagesContent() {
               <div className={styles.messages} ref={messagesBoxRef}>
                 {messages.map(m => {
                   const isMine = m.senderUid === auth?.currentUser?.uid;
+
                   const msgMillis =
                     m.sentAt && typeof m.sentAt.toMillis === "function"
                       ? m.sentAt.toMillis()
@@ -228,11 +275,13 @@ function MessagesContent() {
                             : styles.msgBubbleGray
                         }
                       >
-                        {m.text}
+                        <div className={styles.msgText}>{m.text}</div>
+
                         <div className={styles.msgMeta}>
                           <span className={styles.msgClock}>
                             {formatTime(m.sentAt)}
                           </span>
+
                           {isMine && (
                             <span
                               className={
@@ -259,16 +308,18 @@ function MessagesContent() {
               </div>
 
               <div className={styles.inputArea}>
-                <input
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && send()}
-                  placeholder="Type a message…"
-                  className={styles.inputField}
-                />
-                <button onClick={send} className={styles.sendBtn}>
-                  Send
-                </button>
+                <div className={styles.inputWrapper}>
+                  <input
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && send()}
+                    placeholder="Type a message…"
+                    className={styles.inputField}
+                  />
+                  <button onClick={send} className={styles.sendBtn}>
+                    Send
+                  </button>
+                </div>
               </div>
             </>
           ) : (
