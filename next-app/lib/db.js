@@ -47,7 +47,6 @@ export async function getUserProfile(userId) {
     }
     return null;
   } catch (error) {
-    console.error("Error getting user profile:", error);
     return null;
   }
 }
@@ -61,7 +60,6 @@ export async function setUserProfile(userId, profileData) {
     });
     return true;
   } catch (error) {
-    console.error("Error setting user profile:", error);
     return false;
   }
 }
@@ -88,8 +86,7 @@ export const getUserTrips = async (userId) => {
       ...d.data(),
       date: d.data().date?.toDate ? d.data().date.toDate() : new Date(d.data().date)
     }));
-  } catch (error) {
-    console.error("Error getting user trips:", error);
+  } catch {
     return [];
   }
 };
@@ -104,8 +101,7 @@ export const getUserOrders = async (userId) => {
       const dateB = b.bookedAt?.toDate ? b.bookedAt.toDate() : new Date(b.bookedAt || 0);
       return dateB - dateA;
     });
-  } catch (error) {
-    console.error("Error getting user orders:", error);
+  } catch {
     return [];
   }
 };
@@ -120,8 +116,7 @@ export const getUserReviews = async (userId) => {
       createdAt: d.data().createdAt?.toDate()
     }));
     return reviews.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  } catch (error) {
-    console.error("Error getting user reviews:", error);
+  } catch {
     return [];
   }
 };
@@ -164,15 +159,6 @@ export const getTrip = async (tripId) => {
 };
 
 export const listenToAvailableTrips = (filters = {}, callback) => {
-  if (typeof filters === "function") {
-    callback = filters;
-    filters = {};
-  }
-
-  if (typeof callback !== "function") {
-    return () => {};
-  }
-
   let q = query(collection(db, "trips"), where("status", "==", "available"));
 
   if (filters.from) {
@@ -428,126 +414,48 @@ export const markNotificationRead = async (id) => {
   await updateDoc(doc(db, "notifications", id), { isRead: true });
 };
 
-// ============ MESSAGING FUNCTIONS ============
-
 let currentTripId = null;
+export const setCurrentTripId = (id) => currentTripId = id;
 
-export const setCurrentTripId = (id) => {
-  console.log("Setting current trip ID:", id);
-  currentTripId = id;
-};
-
-// Send message
 export const sendTripMessage = async (text) => {
-  if (!currentTripId) {
-    console.error("No trip selected");
-    throw new Error("No trip selected");
-  }
+  if (!currentTripId || !auth.currentUser) return;
   
-  if (!auth.currentUser) {
-    console.error("User not authenticated");
-    throw new Error("User not authenticated");
-  }
-  
-  if (!text || !text.trim()) {
-    console.error("Empty message");
-    throw new Error("Message cannot be empty");
-  }
-
-  console.log("Sending message to trip:", currentTripId, "Text:", text);
-  
-  try {
-    const messageData = {
-      text: text.trim(),
-      sender: auth.currentUser.displayName || auth.currentUser.email,
-      senderUid: auth.currentUser.uid,
-      sentAt: serverTimestamp(),
-      seenBy: [auth.currentUser.uid] // Sender has seen their own message
-    };
-
-    console.log("Message data:", messageData);
-
-    const docRef = await addDoc(
-      collection(db, "trips", currentTripId, "messages"),
-      messageData
-    );
-
-    console.log("Message sent successfully with ID:", docRef.id);
-    return docRef.id;
-  } catch (error) {
-    console.error("Error sending message:", error);
-    throw error;
-  }
+  await addDoc(collection(db, "trips", currentTripId, "messages"), {
+    text,
+    sender: auth.currentUser.displayName || auth.currentUser.email,
+    senderUid: auth.currentUser.uid,
+    sentAt: serverTimestamp(),
+    seenBy: [auth.currentUser.uid]
+  });
 };
 
-// Listen to chat messages
 export const listenToTripChat = (callback) => {
-  if (!currentTripId) {
-    console.error("No trip ID for listening to chat");
-    return () => { };
-  }
-
-  console.log("Listening to chat for trip:", currentTripId);
-
+  if (!currentTripId) return () => { };
   const q = query(
     collection(db, "trips", currentTripId, "messages"),
     orderBy("sentAt", "asc")
   );
-
-  return onSnapshot(
-    q,
-    (snap) => {
-      const messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      console.log("Received messages:", messages.length);
-      callback(messages);
-    },
-    (error) => {
-      console.error("Error listening to chat:", error);
-    }
-  );
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
 };
 
-// Listen to last message for sidebar preview
 export const listenToTripLastMessage = (tripId, callback) => {
-  if (!tripId) {
-    console.error("No trip ID for listening to last message");
-    return () => {};
-  }
-
   const q = query(
     collection(db, "trips", tripId, "messages"),
     orderBy("sentAt", "desc"),
     limit(1)
   );
-  
-  return onSnapshot(
-    q,
-    (snap) => {
-      const lastMsg = snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
-      callback(lastMsg);
-    },
-    (error) => {
-      console.error("Error listening to last message:", error);
-    }
-  );
+  return onSnapshot(q, snap => {
+    callback(snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() });
+  });
 };
 
-// Mark messages as seen
 export const markTripMessagesSeen = async (tripId) => {
-  if (!tripId) {
-    console.error("No trip ID to mark as seen");
-    return;
-  }
-
-  if (!auth.currentUser) {
-    console.error("User not authenticated");
-    return;
-  }
-
-  const uid = auth.currentUser.uid;
-  console.log("Marking messages as seen for trip:", tripId, "by user:", uid);
+  if (!tripId || !auth.currentUser) return;
 
   try {
+    const uid = auth.currentUser.uid;
     const q = query(
       collection(db, "trips", tripId, "messages"),
       orderBy("sentAt", "desc"),
@@ -555,17 +463,13 @@ export const markTripMessagesSeen = async (tripId) => {
     );
 
     const snap = await getDocs(q);
-    console.log("Found", snap.docs.length, "messages to check");
-
     const batch = [];
     
     snap.docs.forEach((d) => {
       const data = d.data();
       const seenBy = Array.isArray(data.seenBy) ? data.seenBy : [];
 
-      // Only mark if it's not my message and I haven't seen it
       if (data.senderUid !== uid && !seenBy.includes(uid)) {
-        console.log("Marking message as seen:", d.id);
         batch.push(
           updateDoc(doc(db, "trips", tripId, "messages", d.id), {
             seenBy: [...seenBy, uid]
@@ -575,18 +479,13 @@ export const markTripMessagesSeen = async (tripId) => {
     });
 
     if (batch.length > 0) {
-      console.log("Updating", batch.length, "messages");
       await Promise.all(batch);
-      console.log("Messages marked as seen successfully");
-    } else {
-      console.log("No messages to mark as seen");
     }
   } catch (error) {
     console.error("Error marking messages as seen:", error);
   }
 };
 
-// Get conversations
 export async function getConversations(userId) {
   const q = query(
     collection(db, "conversations"),
@@ -597,31 +496,4 @@ export async function getConversations(userId) {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-// Optional: Mark trip as read
-export const markTripRead = async (tripId) => {
-  if (!auth.currentUser || !tripId) return;
-  try {
-    await updateDoc(doc(db, "trips", tripId), {
-      [`readAt.${auth.currentUser.uid}`]: serverTimestamp()
-    });
-  } catch (error) {
-    console.error("Error marking trip as read:", error);
-  }
-};
-
-// Listen to read status
-export const listenToTripReadAt = (tripId, callback) => {
-  if (!tripId) return () => {};
-  return onSnapshot(
-    doc(db, "trips", tripId),
-    (snap) => {
-      const data = snap.exists() ? snap.data() : null;
-      callback(data?.readAt || {});
-    },
-    (error) => {
-      console.error("Error listening to read status:", error);
-    }
-  );
-};
-
-console.log("CarryConnect db.js loaded with messaging support");
+console.log("CarryConnect db.js loaded");
