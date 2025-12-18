@@ -20,14 +20,11 @@ export default function MessagesPage() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
 
-  const messagesEndRef = useRef(null);
-  const shouldAutoScrollRef = useRef(true);
+  const messagesBoxRef = useRef(null);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthChange((currentUser) => {
-      setUser(currentUser);
-    });
-    return () => unsubscribeAuth();
+    const unsub = onAuthChange(setUser);
+    return () => unsub();
   }, []);
 
   useEffect(() => {
@@ -40,36 +37,30 @@ export default function MessagesPage() {
       const postedTrips = await getUserTrips(user.uid);
       const bookedOrders = await getUserOrders(user.uid);
 
-      const combinedChats = [...postedTrips, ...bookedOrders].filter(
-        (trip) => trip.status === "booked"
+      const combined = [...postedTrips, ...bookedOrders].filter(
+        t => t.status === "booked"
       );
 
-      const formattedChats = combinedChats.map(trip => {
+      const chats = combined.map(trip => {
         const isCarrier = trip.carrierUid === user.uid;
-        const otherPersonName = isCarrier
-          ? trip.bookedByEmail
-          : trip.carrierName;
-
-        const route = `${trip.from} → ${trip.to}`;
+        const otherName = isCarrier ? trip.bookedByEmail : trip.carrierName;
 
         return {
           tripId: trip.id,
-          name: otherPersonName,
-          route,
+          name: otherName,
+          route: `${trip.from} → ${trip.to}`,
           lastMessage: "Tap to open chat...",
           lastMessageAt: null,
-          lastMessageSenderUid: null,
           unread: false,
-          avatar: otherPersonName ? otherPersonName[0].toUpperCase() : "?",
-          tripData: trip
+          avatar: otherName?.[0]?.toUpperCase() || "?"
         };
       });
 
-      const uniqueChats = Array.from(
-        new Set(formattedChats.map(c => c.tripId))
-      ).map(id => formattedChats.find(c => c.tripId === id));
-
-      setConversations(uniqueChats);
+      setConversations(
+        Array.from(new Set(chats.map(c => c.tripId))).map(id =>
+          chats.find(c => c.tripId === id)
+        )
+      );
     };
 
     fetchConversations();
@@ -79,57 +70,45 @@ export default function MessagesPage() {
 
   const getLastSeen = (uid, tripId) => {
     try {
-      const raw = localStorage.getItem(getSeenKey(uid, tripId));
-      return raw ? Number(raw) : 0;
+      return Number(localStorage.getItem(getSeenKey(uid, tripId))) || 0;
     } catch {
       return 0;
     }
   };
 
-  const setLastSeen = (uid, tripId, ts) => {
+  const setLastSeen = (uid, tripId) => {
     try {
-      localStorage.setItem(getSeenKey(uid, tripId), String(ts));
+      localStorage.setItem(getSeenKey(uid, tripId), Date.now());
     } catch {}
   };
 
   useEffect(() => {
     if (!user || conversations.length === 0) return;
 
-    const unsubs = conversations.map((chat) => {
-      return listenToTripLastMessage(chat.tripId, (msg) => {
-        setConversations((prev) => {
-          const next = prev.map((c) => {
+    const unsubs = conversations.map(chat =>
+      listenToTripLastMessage(chat.tripId, msg => {
+        setConversations(prev =>
+          prev.map(c => {
             if (c.tripId !== chat.tripId) return c;
 
-            const lastSeen = getLastSeen(user.uid, chat.tripId);
-            const msgTime = msg?.sentAt?.toMillis
-              ? msg.sentAt.toMillis()
-              : 0;
-
+            const msgTime = msg?.sentAt?.toMillis?.() || 0;
             const unread =
-              !!msg &&
-              msgTime > lastSeen &&
-              msg.senderUid &&
-              msg.senderUid !== user.uid;
+              msg &&
+              msg.senderUid !== user.uid &&
+              msgTime > getLastSeen(user.uid, chat.tripId);
 
             return {
               ...c,
               lastMessage: msg?.text || "Tap to open chat...",
               lastMessageAt: msg?.sentAt || null,
-              lastMessageSenderUid: msg?.senderUid || null,
               unread
             };
-          });
-          return next;
-        });
-      });
-    });
+          })
+        );
+      })
+    );
 
-    return () => {
-      unsubs.forEach((u) => {
-        try { u && u(); } catch {}
-      });
-    };
+    return () => unsubs.forEach(u => u && u());
   }, [user, conversations.length]);
 
   useEffect(() => {
@@ -140,38 +119,34 @@ export default function MessagesPage() {
 
     setCurrentTripId(selectedTripId);
 
-    const unsubscribe = listenToTripChat((msgs) => {
+    const unsub = listenToTripChat(msgs => {
       setMessages(msgs);
+      requestAnimationFrame(() => {
+        if (messagesBoxRef.current) {
+          messagesBoxRef.current.scrollTop =
+            messagesBoxRef.current.scrollHeight;
+        }
+      });
     });
 
     return () => {
-      unsubscribe();
+      unsub();
       setCurrentTripId(null);
     };
   }, [selectedTripId]);
 
-  useEffect(() => {
-    if (shouldAutoScrollRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
-
-  const openChat = (tripId) => {
-    if (user) setLastSeen(user.uid, tripId, Date.now());
-    shouldAutoScrollRef.current = true;
+  const openChat = tripId => {
+    if (user) setLastSeen(user.uid, tripId);
     setSelectedTripId(tripId);
   };
 
   const send = () => {
-    if (!input.trim() || !selectedTripId) return;
-    shouldAutoScrollRef.current = true;
+    if (!input.trim()) return;
     sendTripMessage(input);
     setInput("");
   };
 
-  const currentChat = conversations.find(
-    c => c.tripId === selectedTripId
-  );
+  const currentChat = conversations.find(c => c.tripId === selectedTripId);
 
   return (
     <div className={styles.page}>
@@ -179,45 +154,35 @@ export default function MessagesPage() {
         <div className={styles.sidebar}>
           <h3 className={styles.sidebarTitle}>Messages</h3>
 
-          {user ? (
-            conversations.length === 0 ? (
-              <div className={styles.emptyState}>
-                No active bookings or trips.
-              </div>
-            ) : (
-              conversations.map((chat) => (
-                <div
-                  key={chat.tripId}
+          {conversations.map(chat => (
+            <div
+              key={chat.tripId}
+              className={
+                chat.tripId === selectedTripId
+                  ? `${styles.chatItem} ${styles.selectedChat}`
+                  : styles.chatItem
+              }
+              onClick={() => openChat(chat.tripId)}
+            >
+              <div className={styles.chatAvatar}>{chat.avatar}</div>
+              <div className={styles.chatInfo}>
+                <p className={styles.chatName}>
+                  {chat.name}
+                  {chat.unread && <span className={styles.unreadDot} />}
+                </p>
+                <p className={styles.chatRoute}>{chat.route}</p>
+                <p
                   className={
-                    chat.tripId === selectedTripId
-                      ? `${styles.chatItem} ${styles.selectedChat}`
-                      : styles.chatItem
+                    chat.unread
+                      ? `${styles.chatMsg} ${styles.chatMsgUnread}`
+                      : styles.chatMsg
                   }
-                  onClick={() => openChat(chat.tripId)}
                 >
-                  <div className={styles.chatAvatar}>{chat.avatar}</div>
-                  <div className={styles.chatInfo}>
-                    <p className={styles.chatName}>
-                      {chat.name}
-                      {chat.unread && <span className={styles.unreadDot} />}
-                    </p>
-                    <p className={styles.chatRoute}>{chat.route}</p>
-                    <p className={
-                      chat.unread
-                        ? `${styles.chatMsg} ${styles.chatMsgUnread}`
-                        : styles.chatMsg
-                    }>
-                      {chat.lastMessage}
-                    </p>
-                  </div>
-                </div>
-              ))
-            )
-          ) : (
-            <div className={styles.emptyState}>
-              Please login to see messages.
+                  {chat.lastMessage}
+                </p>
+              </div>
             </div>
-          )}
+          ))}
         </div>
 
         <div className={styles.chatWindow}>
@@ -233,28 +198,38 @@ export default function MessagesPage() {
                 </div>
               </div>
 
-              <div className={styles.messages}>
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={
-                      m.senderUid === auth?.currentUser?.uid
-                        ? styles.msgBoxRight
-                        : styles.msgBox
-                    }
-                  >
+              <div className={styles.messages} ref={messagesBoxRef}>
+                {messages.map(m => {
+                  const isMine =
+                    m.senderUid === auth?.currentUser?.uid;
+
+                  const seen =
+                    isMine &&
+                    m.sentAt?.toMillis?.() <=
+                      getLastSeen(user.uid, selectedTripId);
+
+                  return (
                     <div
-                      className={
-                        m.senderUid === auth?.currentUser?.uid
-                          ? styles.msgBubbleBlue
-                          : styles.msgBubbleGray
-                      }
+                      key={m.id}
+                      className={isMine ? styles.msgBoxRight : styles.msgBox}
                     >
-                      {m.text}
+                      <div
+                        className={
+                          isMine
+                            ? styles.msgBubbleBlue
+                            : styles.msgBubbleGray
+                        }
+                      >
+                        {m.text}
+                        {isMine && (
+                          <div className={styles.msgTime}>
+                            {seen ? "✔✔ Seen" : "✔ Delivered"}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-                <div ref={messagesEndRef} />
+                  );
+                })}
               </div>
 
               <div className={styles.inputArea}>
@@ -262,10 +237,10 @@ export default function MessagesPage() {
                   <input
                     type="text"
                     value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && send()}
-                    placeholder="Type a message..."
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && send()}
                     className={styles.inputField}
+                    placeholder="Type a message..."
                   />
                   <button onClick={send} className={styles.sendBtn}>
                     Send
@@ -275,7 +250,7 @@ export default function MessagesPage() {
             </>
           ) : (
             <div className={styles.noChatSelected}>
-              <h3>Select a chat to start messaging</h3>
+              <h3>Select a chat</h3>
             </div>
           )}
         </div>
