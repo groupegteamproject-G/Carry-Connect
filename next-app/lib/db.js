@@ -158,15 +158,45 @@ export const getTrip = async (tripId) => {
   };
 };
 
-export const listenToAvailableTrips = (callback) => {
-  const q = query(collection(db, "trips"), where("status", "==", "available"));
+export const listenToAvailableTrips = (filters = {}, callback) => {
+  let q = query(collection(db, "trips"), where("status", "==", "available"));
+
+  if (filters.from) {
+    // Basic normalization: Assuming case-sensitive matching or exact strings stored in DB.
+    // For a real production app, you'd want a normalized 'from_lower' field in DB.
+    // Here we trust the exact match for now as per instructions to keep it simple but professional.
+    q = query(q, where("from", "==", filters.from));
+  }
+
+  if (filters.to) {
+    q = query(q, where("to", "==", filters.to));
+  }
+
+  if (filters.date) {
+    // Filter trips on or after the selected date
+    const startOfDay = new Date(filters.date);
+    startOfDay.setHours(0, 0, 0, 0);
+    q = query(q, where("date", ">=", startOfDay));
+    // When ordering by date or filtering by inequality, we usually want to order by date
+    q = query(q, orderBy("date", "asc"));
+  }
+
+  // Transport Type filter (Server-side)
+  if (filters.transportType && filters.transportType !== "All") {
+    q = query(q, where("transportType", "==", filters.transportType));
+  }
+
   return onSnapshot(q, snap => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    callback(snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      date: d.data().date?.toDate ? d.data().date.toDate() : new Date(d.data().date)
+    })));
   });
 };
 
 export const listenToMyTrips = (callback) => {
-  if (!auth.currentUser) return () => {};
+  if (!auth.currentUser) return () => { };
   const q = query(
     collection(db, "trips"),
     where("carrierUid", "==", auth.currentUser.uid),
@@ -287,7 +317,7 @@ export const rejectBookingRequest = async (requestId) => {
 };
 
 export const listenToMyBookingRequests = (callback) => {
-  if (!auth.currentUser) return () => {};
+  if (!auth.currentUser) return () => { };
   const q = query(
     collection(db, "booking_requests"),
     where("carrierUid", "==", auth.currentUser.uid),
@@ -299,7 +329,7 @@ export const listenToMyBookingRequests = (callback) => {
 };
 
 export const listenToMyBookingRequestStatus = (tripId, callback) => {
-  if (!auth.currentUser) return () => {};
+  if (!auth.currentUser) return () => { };
   const q = query(
     collection(db, "booking_requests"),
     where("tripId", "==", tripId),
@@ -311,7 +341,7 @@ export const listenToMyBookingRequestStatus = (tripId, callback) => {
 };
 
 export const listenToMySentRequests = (callback) => {
-  if (!auth.currentUser) return () => {};
+  if (!auth.currentUser) return () => { };
   const q = query(
     collection(db, "booking_requests"),
     where("shipperId", "==", auth.currentUser.uid),
@@ -323,7 +353,7 @@ export const listenToMySentRequests = (callback) => {
 };
 
 export const listenToMyBookings = (callback) => {
-  if (!auth.currentUser) return () => {};
+  if (!auth.currentUser) return () => { };
 
   const tripsQuery = query(
     collection(db, "trips"),
@@ -375,7 +405,7 @@ export const createNotification = async ({ userId, title, message, link }) => {
 };
 
 export const listenToNotifications = (callback) => {
-  if (!auth.currentUser) return () => {};
+  if (!auth.currentUser) return () => { };
   const q = query(
     collection(db, "notifications"),
     where("userId", "==", auth.currentUser.uid),
@@ -404,7 +434,7 @@ export const sendTripMessage = async (text) => {
 };
 
 export const listenToTripChat = (callback) => {
-  if (!currentTripId) return () => {};
+  if (!currentTripId) return () => { };
   const q = query(
     collection(db, "trips", currentTripId, "messages"),
     orderBy("sentAt", "asc")
