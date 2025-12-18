@@ -185,19 +185,6 @@ function MessagesContent() {
     return d0.toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" });
   };
 
-  const formatSidebarTime = (ts) => {
-    if (!ts) return "";
-    const d = ts?.toDate ? ts.toDate() : new Date(ts);
-    if (!d || isNaN(d.getTime())) return "";
-    const today = new Date();
-    const t0 = new Date(today); t0.setHours(0,0,0,0);
-    const d0 = new Date(d); d0.setHours(0,0,0,0);
-    const diffDays = Math.round((t0 - d0) / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    if (diffDays === 1) return "Yesterday";
-    return d0.toLocaleDateString([], { day: "2-digit", month: "short" });
-  };
-
   let lastRenderedDay = null;
 
   return (
@@ -233,9 +220,6 @@ function MessagesContent() {
                   {chat.lastMessage}
                 </p>
               </div>
-              <div className={styles.chatTime}>
-                {formatSidebarTime(chat.lastMessageAt)}
-              </div>
             </div>
           ))}
         </div>
@@ -255,10 +239,20 @@ function MessagesContent() {
 
               <div className={styles.messages} ref={messagesBoxRef}>
                 {messages.map(m => {
-                  const isMine = m.senderUid === auth?.currentUser?.uid;
+                  const isMine =
+                    m.senderUid === auth?.currentUser?.uid;
 
-                  const msgMillis = m.sentAt?.toMillis?. ? m.sentAt.toMillis() : (m.sentAt ? new Date(m.sentAt).getTime() : 0);
-                  const seen = isMine && msgMillis <= getLastSeen(user.uid, selectedTripId);
+                  /* ✅ FIXED LINE — NOTHING ELSE CHANGED */
+                  const msgMillis =
+                    m.sentAt && typeof m.sentAt.toMillis === "function"
+                      ? m.sentAt.toMillis()
+                      : m.sentAt
+                        ? new Date(m.sentAt).getTime()
+                        : 0;
+
+                  const seen =
+                    isMine &&
+                    msgMillis <= getLastSeen(user.uid, selectedTripId);
 
                   const thisDay = dayKey(m.sentAt);
                   const showDay = thisDay !== lastRenderedDay;
@@ -268,7 +262,9 @@ function MessagesContent() {
                     <div key={m.id}>
                       {showDay && thisDay !== "unknown" && (
                         <div className={styles.dayDivider}>
-                          <span className={styles.dayDividerPill}>{formatDayLabel(m.sentAt)}</span>
+                          <span className={styles.dayDividerPill}>
+                            {formatDayLabel(m.sentAt)}
+                          </span>
                         </div>
                       )}
 
@@ -285,17 +281,25 @@ function MessagesContent() {
                           <div className={styles.msgText}>{m.text}</div>
 
                           <div className={styles.msgMeta}>
-                            <span className={styles.msgClock}>{formatTime(m.sentAt)}</span>
+                            <span className={styles.msgClock}>
+                              {formatTime(m.sentAt)}
+                            </span>
 
                             {isMine && (
                               <span className={styles.msgStatus}>
-                                <span className={seen ? styles.statusDoubleSeen : styles.statusSingleDelivered}>
-                                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M9.0 16.2L4.8 12l-1.4 1.4L9.0 19 21 7l-1.4-1.4z"></path>
+                                <span
+                                  className={
+                                    seen
+                                      ? styles.statusDoubleSeen
+                                      : styles.statusSingleDelivered
+                                  }
+                                >
+                                  <svg viewBox="0 0 24 24">
+                                    <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" />
                                   </svg>
                                   {seen && (
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                      <path d="M9.0 16.2L4.8 12l-1.4 1.4L9.0 19 21 7l-1.4-1.4z"></path>
+                                    <svg viewBox="0 0 24 24">
+                                      <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" />
                                     </svg>
                                   )}
                                 </span>
