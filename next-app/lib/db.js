@@ -158,15 +158,48 @@ export const getTrip = async (tripId) => {
   };
 };
 
-export const listenToAvailableTrips = (callback) => {
-  const q = query(collection(db, "trips"), where("status", "==", "available"));
+export const listenToAvailableTrips = (filters = {}, callback) => {
+  if (typeof filters === "function") {
+    callback = filters;
+    filters = {};
+  }
+
+  if (typeof callback !== "function") {
+    return () => {};
+  }
+
+  let q = query(collection(db, "trips"), where("status", "==", "available"));
+
+  if (filters.from) {
+    q = query(q, where("from", "==", filters.from));
+  }
+
+  if (filters.to) {
+    q = query(q, where("to", "==", filters.to));
+  }
+
+  if (filters.date) {
+    const startOfDay = new Date(filters.date);
+    startOfDay.setHours(0, 0, 0, 0);
+    q = query(q, where("date", ">=", startOfDay));
+    q = query(q, orderBy("date", "asc"));
+  }
+
+  if (filters.transportType && filters.transportType !== "All") {
+    q = query(q, where("transportType", "==", filters.transportType));
+  }
+
   return onSnapshot(q, snap => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    callback(snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      date: d.data().date?.toDate ? d.data().date.toDate() : new Date(d.data().date)
+    })));
   });
 };
 
 export const listenToMyTrips = (callback) => {
-  if (!auth.currentUser) return () => {};
+  if (!auth.currentUser) return () => { };
   const q = query(
     collection(db, "trips"),
     where("carrierUid", "==", auth.currentUser.uid),
@@ -287,7 +320,7 @@ export const rejectBookingRequest = async (requestId) => {
 };
 
 export const listenToMyBookingRequests = (callback) => {
-  if (!auth.currentUser) return () => {};
+  if (!auth.currentUser) return () => { };
   const q = query(
     collection(db, "booking_requests"),
     where("carrierUid", "==", auth.currentUser.uid),
@@ -299,7 +332,7 @@ export const listenToMyBookingRequests = (callback) => {
 };
 
 export const listenToMyBookingRequestStatus = (tripId, callback) => {
-  if (!auth.currentUser) return () => {};
+  if (!auth.currentUser) return () => { };
   const q = query(
     collection(db, "booking_requests"),
     where("tripId", "==", tripId),
@@ -311,7 +344,7 @@ export const listenToMyBookingRequestStatus = (tripId, callback) => {
 };
 
 export const listenToMySentRequests = (callback) => {
-  if (!auth.currentUser) return () => {};
+  if (!auth.currentUser) return () => { };
   const q = query(
     collection(db, "booking_requests"),
     where("shipperId", "==", auth.currentUser.uid),
@@ -323,7 +356,7 @@ export const listenToMySentRequests = (callback) => {
 };
 
 export const listenToMyBookings = (callback) => {
-  if (!auth.currentUser) return () => {};
+  if (!auth.currentUser) return () => { };
 
   const tripsQuery = query(
     collection(db, "trips"),
@@ -375,7 +408,7 @@ export const createNotification = async ({ userId, title, message, link }) => {
 };
 
 export const listenToNotifications = (callback) => {
-  if (!auth.currentUser) return () => {};
+  if (!auth.currentUser) return () => { };
   const q = query(
     collection(db, "notifications"),
     where("userId", "==", auth.currentUser.uid),
@@ -393,35 +426,52 @@ export const markNotificationRead = async (id) => {
 let currentTripId = null;
 export const setCurrentTripId = (id) => currentTripId = id;
 
+// FIXED: Send message with proper seenBy initialization
 export const sendTripMessage = async (text) => {
   if (!currentTripId || !auth.currentUser) return;
-  await addDoc(collection(db, "trips", currentTripId, "messages"), {
-    text,
-    sender: auth.currentUser.displayName || auth.currentUser.email,
-    senderUid: auth.currentUser.uid,
-    sentAt: serverTimestamp()
-  });
+  
+  try {
+    await addDoc(collection(db, "trips", currentTripId, "messages"), {
+      text,
+      sender: auth.currentUser.displayName || auth.currentUser.email,
+      senderUid: auth.currentUser.uid,
+      sentAt: serverTimestamp(),
+      seenBy: [auth.currentUser.uid] // Sender has already seen their own message
+    });
+  } catch (error) {
+    console.error("Error sending message:", error);
+    throw error;
+  }
 };
 
+// Listen to chat messages
 export const listenToTripChat = (callback) => {
-  if (!currentTripId) return () => {};
+  if (!currentTripId) return () => { };
   const q = query(
     collection(db, "trips", currentTripId, "messages"),
     orderBy("sentAt", "asc")
   );
   return onSnapshot(q, snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }, (error) => {
+    console.error("Error listening to chat:", error);
   });
 };
 
+// Listen to last message for preview in sidebar
 export const listenToTripLastMessage = (tripId, callback) => {
+  if (!tripId) return () => {};
+  
   const q = query(
     collection(db, "trips", tripId, "messages"),
     orderBy("sentAt", "desc"),
     limit(1)
   );
+  
   return onSnapshot(q, snap => {
     callback(snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() });
+  }, (error) => {
+    console.error("Error listening to last message:", error);
   });
 };
 
@@ -434,5 +484,70 @@ export async function getConversations(userId) {
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
+
+// FIXED: Mark messages as seen - more efficient batch update
+export const markTripMessagesSeen = async (tripId) => {
+  if (!tripId || !auth.currentUser) return;
+
+  try {
+    const uid = auth.currentUser.uid;
+
+    // Get recent messages
+    const q = query(
+      collection(db, "trips", tripId, "messages"),
+      orderBy("sentAt", "desc"),
+      limit(50) // Increased limit to catch more unread messages
+    );
+
+    const snap = await getDocs(q);
+
+    // Batch updates for better performance
+    const batch = [];
+    
+    snap.docs.forEach((d) => {
+      const data = d.data();
+      const seenBy = Array.isArray(data.seenBy) ? data.seenBy : [];
+
+      // Only update if: message is not from me AND I haven't seen it yet
+      if (data.senderUid !== uid && !seenBy.includes(uid)) {
+        batch.push(
+          updateDoc(doc(db, "trips", tripId, "messages", d.id), {
+            seenBy: [...seenBy, uid]
+          })
+        );
+      }
+    });
+
+    // Execute all updates
+    if (batch.length > 0) {
+      await Promise.all(batch);
+    }
+  } catch (error) {
+    console.error("Error marking messages as seen:", error);
+  }
+};
+
+// Optional: Mark specific trip as read (for notification purposes)
+export const markTripRead = async (tripId) => {
+  if (!auth.currentUser || !tripId) return;
+  try {
+    await updateDoc(doc(db, "trips", tripId), {
+      [`readAt.${auth.currentUser.uid}`]: serverTimestamp()
+    });
+  } catch (error) {
+    console.error("Error marking trip as read:", error);
+  }
+};
+
+// Listen to read status
+export const listenToTripReadAt = (tripId, callback) => {
+  if (!tripId) return () => {};
+  return onSnapshot(doc(db, "trips", tripId), (snap) => {
+    const data = snap.exists() ? snap.data() : null;
+    callback(data?.readAt || {});
+  }, (error) => {
+    console.error("Error listening to read status:", error);
+  });
+};
 
 console.log("CarryConnect db.js loaded");
