@@ -9,12 +9,11 @@ export default function MyOrdersPage() {
     const [orders, setOrders] = useState([]);
     const [sentRequests, setSentRequests] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState("requests"); // 'requests' or 'booked'
+    const [activeTab, setActiveTab] = useState("requests");
 
     useEffect(() => {
         let unsubOrders;
         let unsubRequests;
-        let loadingTimeout;
 
         async function init() {
             try {
@@ -27,17 +26,14 @@ export default function MyOrdersPage() {
                         return;
                     }
 
-                    // Listen to booked trips
                     unsubOrders = listenToMyBookings((bookings) => {
                         setOrders(bookings);
                     });
 
-                    // Listen to sent booking requests
                     unsubRequests = listenToMySentRequests((requests) => {
                         setSentRequests(requests);
                     });
 
-                    // Set loading to false after both listeners are set up
                     setLoading(false);
                 });
             } catch (error) {
@@ -47,11 +43,10 @@ export default function MyOrdersPage() {
         }
 
         init();
-        
+
         return () => {
             if (unsubOrders) unsubOrders();
             if (unsubRequests) unsubRequests();
-            if (loadingTimeout) clearTimeout(loadingTimeout);
         };
     }, [router]);
 
@@ -66,28 +61,31 @@ export default function MyOrdersPage() {
             <div className={styles.container}>
                 <h1 className={styles.pageTitle}>My Orders</h1>
 
-                {/* TABS */}
                 <div className={styles.tabs}>
-                    <button 
-                        className={`${styles.tab} ${activeTab === 'requests' ? styles.activeTab : ''}`}
-                        onClick={() => setActiveTab('requests')}>
+                    <button
+                        className={`${styles.tab} ${activeTab === "requests" ? styles.activeTab : ""}`}
+                        onClick={() => setActiveTab("requests")}
+                    >
                         Booking Requests ({sentRequests.length})
                     </button>
-                    <button 
-                        className={`${styles.tab} ${activeTab === 'booked' ? styles.activeTab : ''}`}
-                        onClick={() => setActiveTab('booked')}>
+                    <button
+                        className={`${styles.tab} ${activeTab === "booked" ? styles.activeTab : ""}`}
+                        onClick={() => setActiveTab("booked")}
+                    >
                         Booked Trips ({orders.length})
                     </button>
                 </div>
 
-                {/* REQUESTS TAB */}
-                {activeTab === 'requests' && (
+                {activeTab === "requests" && (
                     sentRequests.length === 0 ? (
                         <div className={styles.emptyState}>
                             <i className="fa-solid fa-inbox"></i>
                             <h3>No booking requests yet</h3>
                             <p>Find a carrier and send a booking request to get started!</p>
-                            <button className={styles.browseBtn} onClick={() => router.push("/find-a-carrier")}>
+                            <button
+                                className={styles.browseBtn}
+                                onClick={() => router.push("/find-a-carrier")}
+                            >
                                 Find a Carrier
                             </button>
                         </div>
@@ -100,14 +98,16 @@ export default function MyOrdersPage() {
                     )
                 )}
 
-                {/* BOOKED TRIPS TAB */}
-                {activeTab === 'booked' && (
+                {activeTab === "booked" && (
                     orders.length === 0 ? (
                         <div className={styles.emptyState}>
                             <i className="fa-solid fa-box-open"></i>
                             <h3>No booked trips yet</h3>
                             <p>Once a carrier accepts your booking request, it will appear here.</p>
-                            <button className={styles.browseBtn} onClick={() => router.push("/find-a-carrier")}>
+                            <button
+                                className={styles.browseBtn}
+                                onClick={() => router.push("/find-a-carrier")}
+                            >
                                 Find a Carrier
                             </button>
                         </div>
@@ -124,25 +124,15 @@ export default function MyOrdersPage() {
     );
 }
 
-// REQUEST CARD COMPONENT
 function RequestCard({ request }) {
     const [expanded, setExpanded] = useState(false);
 
     const getStatusColor = (status) => {
-        switch(status) {
-            case 'pending': return '#ffc107';
-            case 'accepted': return '#4caf50';
-            case 'rejected': return '#f44336';
-            default: return '#999';
-        }
-    };
-
-    const getStatusIcon = (status) => {
-        switch(status) {
-            case 'pending': return 'fa-hourglass-end';
-            case 'accepted': return 'fa-check-circle';
-            case 'rejected': return 'fa-times-circle';
-            default: return 'fa-circle';
+        switch (status) {
+            case "pending": return "#ffc107";
+            case "accepted": return "#4caf50";
+            case "rejected": return "#f44336";
+            default: return "#999";
         }
     };
 
@@ -150,7 +140,6 @@ function RequestCard({ request }) {
         <div className={styles.requestCard}>
             <div className={styles.requestHeader}>
                 <div className={styles.requestStatus} style={{ backgroundColor: getStatusColor(request.status) }}>
-                    <i className={`fa-solid ${getStatusIcon(request.status)}`}></i>
                     <span>{request.status.toUpperCase()}</span>
                 </div>
                 <span className={styles.requestPrice}>${request.reward}</span>
@@ -160,20 +149,7 @@ function RequestCard({ request }) {
                 <p><strong>Weight:</strong> {request.weight} kg</p>
                 <p><strong>Pickup:</strong> {request.pickupLocation}</p>
                 <p><strong>Dropoff:</strong> {request.dropoffLocation}</p>
-                <p><strong>Sent:</strong> {request.createdAt?.toDate ? request.createdAt.toDate().toLocaleDateString() : new Date(request.createdAt?.seconds * 1000).toLocaleDateString()}</p>
             </div>
-
-            {request.status === 'accepted' && (
-                <div className={styles.acceptedMessage}>
-                    ✅ Carrier accepted! Check messages for details.
-                </div>
-            )}
-
-            {request.status === 'rejected' && (
-                <div className={styles.rejectedMessage}>
-                    ❌ Carrier rejected this request. Try another trip.
-                </div>
-            )}
 
             <button
                 className={styles.expandBtn}
@@ -184,28 +160,15 @@ function RequestCard({ request }) {
 
             {expanded && (
                 <div className={styles.expandedDetails}>
-                    <div>
-                        <p className={styles.detailLabel}>Request ID</p>
-                        <p className={styles.detailValue}>{request.id}</p>
-                    </div>
-                    <div>
-                        <p className={styles.detailLabel}>Status</p>
-                        <p className={styles.detailValue}>{request.status}</p>
-                    </div>
-                    {request.respondedAt && (
-                        <div>
-                            <p className={styles.detailLabel}>Responded On</p>
-                            <p className={styles.detailValue}>{request.respondedAt.toDate ? request.respondedAt.toDate().toLocaleDateString() : new Date(request.respondedAt?.seconds * 1000).toLocaleDateString()}</p>
-                        </div>
-                    )}
+                    <p><strong>Request ID:</strong> {request.id}</p>
                 </div>
             )}
         </div>
     );
 }
 
-// ORDER CARD COMPONENT
 function OrderCard({ order }) {
+    const router = useRouter();
     const [expanded, setExpanded] = useState(false);
 
     return (
@@ -216,36 +179,29 @@ function OrderCard({ order }) {
             </div>
 
             <div className={styles.route}>
-                <div className={styles.location}>
-                    <i className="fa-solid fa-location-dot"></i>
-                    <span>{order.from}</span>
-                </div>
-                <div className={styles.arrow}>→</div>
-                <div className={styles.location}>
-                    <i className="fa-solid fa-location-dot"></i>
-                    <span>{order.to}</span>
-                </div>
+                <span>{order.from}</span>
+                <span>→</span>
+                <span>{order.to}</span>
             </div>
 
             <div className={styles.details}>
-                <div className={styles.detailItem}>
-                    <i className="fa-solid fa-calendar"></i>
-                    <span>{order.date?.toDate ? order.date.toDate().toLocaleDateString() : new Date(order.date).toLocaleDateString()}</span>
-                </div>
-                <div className={styles.detailItem}>
-                    <i className="fa-solid fa-weight-hanging"></i>
-                    <span>{order.weight} kg</span>
-                </div>
-                <div className={styles.detailItem}>
-                    <i className="fa-solid fa-tag"></i>
-                    <span>${order.reward}</span>
-                </div>
+                <span>{order.weight} kg</span>
+                <span>${order.reward}</span>
             </div>
 
             <div className={styles.carrierInfo}>
                 <p><strong>Carrier:</strong> {order.carrierName}</p>
                 <p><strong>Email:</strong> {order.carrierEmail}</p>
             </div>
+
+            {order.status === "booked" && (
+                <button
+                    className={styles.browseBtn}
+                    onClick={() => router.push(`/messages?tripId=${order.id}`)}
+                >
+                    Message
+                </button>
+            )}
 
             <button
                 className={styles.expandBtn}
@@ -256,18 +212,7 @@ function OrderCard({ order }) {
 
             {expanded && (
                 <div className={styles.expandedDetails}>
-                    <div>
-                        <p className={styles.detailLabel}>Order ID</p>
-                        <p className={styles.detailValue}>{order.id}</p>
-                    </div>
-                    <div>
-                        <p className={styles.detailLabel}>Booked On</p>
-                        <p className={styles.detailValue}>{order.bookedAt?.toDate ? order.bookedAt.toDate().toLocaleDateString() : "N/A"}</p>
-                    </div>
-                    <div>
-                        <p className={styles.detailLabel}>Status</p>
-                        <p className={styles.detailValue}>{order.status || "Pending"}</p>
-                    </div>
+                    <p><strong>Order ID:</strong> {order.id}</p>
                 </div>
             )}
         </div>
