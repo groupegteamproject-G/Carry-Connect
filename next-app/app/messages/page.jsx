@@ -26,6 +26,14 @@ function MessagesContent() {
 
   const messagesBoxRef = useRef(null);
 
+  const toMillisSafe = (ts) => {
+    if (!ts) return 0;
+    if (typeof ts.toMillis === "function") return ts.toMillis();
+    if (typeof ts.toDate === "function") return ts.toDate().getTime();
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  };
+
   useEffect(() => {
     const unsub = onAuthChange(setUser);
     return () => unsub();
@@ -49,12 +57,11 @@ function MessagesContent() {
       const bookedOrders = await getUserOrders(user.uid);
 
       const combined = [...postedTrips, ...bookedOrders].filter(
-        t => t.status === "booked"
+        (t) => t.status === "booked"
       );
 
-      const chats = combined.map(trip => {
+      const chats = combined.map((trip) => {
         const isCarrier = trip.carrierUid === user.uid;
-
         const otherName = isCarrier ? trip.bookedByEmail : trip.carrierName;
         const otherUid = isCarrier ? trip.bookedByUid : trip.carrierUid;
 
@@ -70,8 +77,8 @@ function MessagesContent() {
         };
       });
 
-      const unique = Array.from(new Set(chats.map(c => c.tripId))).map(id =>
-        chats.find(c => c.tripId === id)
+      const unique = Array.from(new Set(chats.map((c) => c.tripId))).map((id) =>
+        chats.find((c) => c.tripId === id)
       );
 
       setConversations(unique);
@@ -80,25 +87,19 @@ function MessagesContent() {
     fetchConversations();
   }, [user]);
 
-  const toMillisSafe = (ts) => {
-    if (!ts) return 0;
-    if (typeof ts.toMillis === "function") return ts.toMillis();
-    const d = new Date(ts);
-    return isNaN(d.getTime()) ? 0 : d.getTime();
-  };
-
-  // Sidebar preview + unread + stable sorting (NO random reorder on click)
+  // Sidebar: last message preview + unread + stable sort by lastMessageAt ONLY
   useEffect(() => {
     if (!user || conversations.length === 0) return;
 
-    const unsubs = conversations.map(chat =>
-      listenToTripLastMessage(chat.tripId, msg => {
-        setConversations(prev => {
-          const updated = prev.map(c => {
+    const unsubs = conversations.map((chat) =>
+      listenToTripLastMessage(chat.tripId, (msg) => {
+        setConversations((prev) => {
+          const updated = prev.map((c) => {
             if (c.tripId !== chat.tripId) return c;
 
-            const isOpenChat = selectedTripId === chat.tripId;
             const seenBy = Array.isArray(msg?.seenBy) ? msg.seenBy : [];
+            const isOpenChat = selectedTripId === chat.tripId;
+
             const unread =
               !isOpenChat &&
               msg &&
@@ -113,7 +114,6 @@ function MessagesContent() {
             };
           });
 
-          // ✅ Sort ONLY by lastMessageAt (Messenger rule). Never random.
           updated.sort((a, b) => {
             const ta = toMillisSafe(a.lastMessageAt);
             const tb = toMillisSafe(b.lastMessageAt);
@@ -126,45 +126,34 @@ function MessagesContent() {
       })
     );
 
-    return () => unsubs.forEach(u => u && u());
+    return () => unsubs.forEach((u) => u && u());
   }, [user, conversations.length, selectedTripId]);
 
-  // Chat messages listener + mark seen when chat is OPEN
+  // Chat listener: show messages + mark seen when chat is open
   useEffect(() => {
     if (!selectedTripId || !user) return;
 
     setCurrentTripId(selectedTripId);
 
-    // When opening a chat, immediately mark messages as seen
+    // when opening chat, mark as seen
     markTripMessagesSeen(selectedTripId);
 
-    const unsub = listenToTripChat(msgs => {
+    const unsub = listenToTripChat((msgs) => {
       setMessages(msgs);
 
-      // If user is viewing this chat, mark incoming messages seen immediately
+      // while viewing chat, keep marking messages seen
       markTripMessagesSeen(selectedTripId);
 
-      // Clear unread dot instantly for the open chat
-      setConversations(prev => {
-        const updated = prev.map(c =>
+      // clear unread immediately for opened chat
+      setConversations((prev) =>
+        prev.map((c) =>
           c.tripId === selectedTripId ? { ...c, unread: false } : c
-        );
-
-        updated.sort((a, b) => {
-          const ta = toMillisSafe(a.lastMessageAt);
-          const tb = toMillisSafe(b.lastMessageAt);
-          if (tb !== ta) return tb - ta;
-          return String(a.tripId).localeCompare(String(b.tripId));
-        });
-
-        return [...updated];
-      });
+        )
+      );
 
       requestAnimationFrame(() => {
         if (messagesBoxRef.current) {
-          messagesBoxRef.current.scrollTo({
-            top: messagesBoxRef.current.scrollHeight
-          });
+          messagesBoxRef.current.scrollTop = messagesBoxRef.current.scrollHeight;
         }
       });
     });
@@ -175,15 +164,13 @@ function MessagesContent() {
     };
   }, [selectedTripId, user]);
 
-  // Facebook-style switching: NO Next navigation refresh, URL still changes
-  const openChat = tripId => {
+  const openChat = (tripId) => {
     if (tripId === selectedTripId) return;
 
     setSelectedTripId(tripId);
 
-    // Clear unread instantly when you click
-    setConversations(prev =>
-      prev.map(c => (c.tripId === tripId ? { ...c, unread: false } : c))
+    setConversations((prev) =>
+      prev.map((c) => (c.tripId === tripId ? { ...c, unread: false } : c))
     );
 
     try {
@@ -197,13 +184,13 @@ function MessagesContent() {
     setInput("");
   };
 
-  const formatTime = ts => {
+  const formatTime = (ts) => {
     const d = ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null;
     if (!d) return "";
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  const currentChat = conversations.find(c => c.tripId === selectedTripId);
+  const currentChat = conversations.find((c) => c.tripId === selectedTripId);
   const otherUid = currentChat?.otherUid || null;
 
   return (
@@ -212,7 +199,7 @@ function MessagesContent() {
         <div className={styles.sidebar}>
           <h3 className={styles.sidebarTitle}>Messages</h3>
 
-          {conversations.map(chat => (
+          {conversations.map((chat) => (
             <div
               key={chat.tripId}
               className={`${styles.chatItem} ${
@@ -242,15 +229,22 @@ function MessagesContent() {
         </div>
 
         <div className={styles.chatWindow}>
-          {selectedTripId ? (
+          {selectedTripId && currentChat ? (
             <>
+              <div className={styles.header}>
+                <div className={styles.headerAvatar}>{currentChat.avatar}</div>
+                <div>
+                  <p className={styles.headerName}>{currentChat.name}</p>
+                  <p className={styles.headerRoute}>{currentChat.route}</p>
+                </div>
+              </div>
+
               <div className={styles.messages} ref={messagesBoxRef}>
-                {messages.map(m => {
+                {messages.map((m) => {
                   const isMine = m.senderUid === auth?.currentUser?.uid;
                   const seenBy = Array.isArray(m.seenBy) ? m.seenBy : [];
 
-                  // ✅ REAL SEEN:
-                  // My message is seen only when OTHER user uid is inside seenBy.
+                  // REAL seen: my message is "seen" only if OTHER uid is in seenBy
                   const seen = isMine && otherUid && seenBy.includes(otherUid);
 
                   return (
@@ -298,11 +292,12 @@ function MessagesContent() {
               <div className={styles.inputArea}>
                 <div className={styles.inputWrapper}>
                   <input
+                    type="text"
                     value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && send()}
-                    placeholder="Type a message…"
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && send()}
                     className={styles.inputField}
+                    placeholder="Type a message..."
                   />
                   <button onClick={send} className={styles.sendBtn}>
                     Send
@@ -311,7 +306,9 @@ function MessagesContent() {
               </div>
             </>
           ) : (
-            <div className={styles.noChatSelected}>Select a chat</div>
+            <div className={styles.noChatSelected}>
+              <h3>Select a chat</h3>
+            </div>
           )}
         </div>
       </div>
