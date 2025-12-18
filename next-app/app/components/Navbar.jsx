@@ -18,6 +18,8 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState([])
   const [showNotifPopup, setShowNotifPopup] = useState(false)
 
+  const [trackedTripIds, setTrackedTripIds] = useState([])
+
   useEffect(() => {
     async function checkAuth() {
       try {
@@ -38,6 +40,7 @@ export default function Navbar() {
     if (!user) {
       setHasUnreadMessages(false)
       setHasUnreadNotifications(false)
+      setTrackedTripIds([])
       setNotifications([])
       return
     }
@@ -45,6 +48,24 @@ export default function Navbar() {
     let mounted = true
     let unsubs = []
     const unreadMap = {}
+
+    const getSeenKey = (uid, tripId) => `cc_seen_${uid}_${tripId}`
+
+    const getLastSeen = (uid, tripId) => {
+      try {
+        const raw = localStorage.getItem(getSeenKey(uid, tripId))
+        return raw ? Number(raw) : 0
+      } catch {
+        return 0
+      }
+    }
+
+    const toMillis = (ts) => {
+      if (!ts) return 0
+      if (ts?.toMillis) return ts.toMillis()
+      if (ts?.toDate) return ts.toDate().getTime()
+      return new Date(ts).getTime()
+    }
 
     async function init() {
       try {
@@ -60,14 +81,14 @@ export default function Navbar() {
 
         const trips = [...posted, ...booked].filter(t => t.status === "booked")
         const ids = Array.from(new Set(trips.map(t => t.id)))
+        setTrackedTripIds(ids)
 
         unsubs = ids.map(tripId =>
           listenToTripLastMessage(tripId, (msg) => {
             if (!mounted || !msg) return
-            
-            const seenBy = Array.isArray(msg.seenBy) ? msg.seenBy : []
-            unreadMap[tripId] = msg.senderUid !== user.uid && !seenBy.includes(user.uid)
-            
+            const lastSeen = getLastSeen(user.uid, tripId)
+            const msgTime = toMillis(msg.sentAt)
+            unreadMap[tripId] = msg.senderUid !== user.uid && msgTime > lastSeen
             setHasUnreadMessages(Object.values(unreadMap).some(Boolean))
           })
         )
@@ -78,9 +99,7 @@ export default function Navbar() {
         })
 
         unsubs.push(unsubNotif)
-      } catch (err) {
-        console.error("Error initializing navbar:", err)
-      }
+      } catch {}
     }
 
     init()
@@ -107,6 +126,11 @@ export default function Navbar() {
   }
 
   const openMessages = () => {
+    const now = Date.now()
+    trackedTripIds.forEach(id => {
+      localStorage.setItem(`cc_seen_${user.uid}_${id}`, String(now))
+    })
+    setHasUnreadMessages(false)
     router.push("/messages")
   }
 
