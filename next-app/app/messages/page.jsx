@@ -23,9 +23,11 @@ function MessagesContent() {
   const [conversations, setConversations] = useState([]);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
 
   const messagesBoxRef = useRef(null);
   const lastMessageCountRef = useRef(0);
+  const inputRef = useRef(null);
 
   const toMillisSafe = (ts) => {
     if (!ts) return 0;
@@ -35,33 +37,37 @@ function MessagesContent() {
     return isNaN(d.getTime()) ? 0 : d.getTime();
   };
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom
   const scrollToBottom = (force = false) => {
-    if (messagesBoxRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = messagesBoxRef.current;
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-      
-      if (force || isNearBottom) {
-        requestAnimationFrame(() => {
-          if (messagesBoxRef.current) {
-            messagesBoxRef.current.scrollTop = messagesBoxRef.current.scrollHeight;
-          }
-        });
+    setTimeout(() => {
+      if (messagesBoxRef.current) {
+        const { scrollTop, scrollHeight, clientHeight } = messagesBoxRef.current;
+        const isNearBottom = scrollHeight - scrollTop - clientHeight < 150;
+        
+        if (force || isNearBottom) {
+          messagesBoxRef.current.scrollTop = messagesBoxRef.current.scrollHeight;
+        }
       }
-    }
+    }, 100);
   };
 
+  // Auth listener
   useEffect(() => {
-    const unsub = onAuthChange(setUser);
+    const unsub = onAuthChange((u) => {
+      console.log("Auth changed:", u?.uid);
+      setUser(u);
+    });
     return () => unsub();
   }, []);
 
+  // Get tripId from URL
   useEffect(() => {
     const tripIdFromUrl = searchParams.get("tripId");
     if (tripIdFromUrl && tripIdFromUrl !== selectedTripId) {
+      console.log("Setting tripId from URL:", tripIdFromUrl);
       setSelectedTripId(tripIdFromUrl);
     }
-  }, [searchParams, selectedTripId]);
+  }, [searchParams]);
 
   // Fetch conversations
   useEffect(() => {
@@ -70,45 +76,59 @@ function MessagesContent() {
       return;
     }
 
+    console.log("Fetching conversations for user:", user.uid);
+
     const fetchConversations = async () => {
-      const postedTrips = await getUserTrips(user.uid);
-      const bookedOrders = await getUserOrders(user.uid);
+      try {
+        const postedTrips = await getUserTrips(user.uid);
+        const bookedOrders = await getUserOrders(user.uid);
 
-      const combined = [...postedTrips, ...bookedOrders].filter(
-        (t) => t.status === "booked"
-      );
+        console.log("Posted trips:", postedTrips.length);
+        console.log("Booked orders:", bookedOrders.length);
 
-      const chats = combined.map((trip) => {
-        const isCarrier = trip.carrierUid === user.uid;
-        const otherName = isCarrier ? trip.bookedByEmail : trip.carrierName;
-        const otherUid = isCarrier ? trip.bookedByUid : trip.carrierUid;
+        const combined = [...postedTrips, ...bookedOrders].filter(
+          (t) => t.status === "booked"
+        );
 
-        return {
-          tripId: trip.id,
-          name: otherName,
-          otherUid,
-          route: `${trip.from} → ${trip.to}`,
-          lastMessage: "No messages yet",
-          lastMessageAt: null,
-          unread: false,
-          avatar: otherName?.[0]?.toUpperCase() || "?"
-        };
-      });
+        console.log("Booked trips:", combined.length);
 
-      // Remove duplicates
-      const unique = Array.from(new Set(chats.map((c) => c.tripId))).map((id) =>
-        chats.find((c) => c.tripId === id)
-      );
+        const chats = combined.map((trip) => {
+          const isCarrier = trip.carrierUid === user.uid;
+          const otherName = isCarrier ? trip.bookedByEmail : trip.carrierName;
+          const otherUid = isCarrier ? trip.bookedByUid : trip.carrierUid;
 
-      setConversations(unique);
+          return {
+            tripId: trip.id,
+            name: otherName,
+            otherUid,
+            route: `${trip.from} → ${trip.to}`,
+            lastMessage: "No messages yet",
+            lastMessageAt: null,
+            unread: false,
+            avatar: otherName?.[0]?.toUpperCase() || "?"
+          };
+        });
+
+        // Remove duplicates
+        const unique = Array.from(new Set(chats.map((c) => c.tripId))).map((id) =>
+          chats.find((c) => c.tripId === id)
+        );
+
+        console.log("Unique conversations:", unique.length);
+        setConversations(unique);
+      } catch (error) {
+        console.error("Error fetching conversations:", error);
+      }
     };
 
     fetchConversations();
   }, [user]);
 
-  // Listen to last messages and update conversations
+  // Listen to last messages
   useEffect(() => {
     if (!user || conversations.length === 0) return;
+
+    console.log("Setting up listeners for", conversations.length, "conversations");
 
     const unsubs = conversations.map((chat) =>
       listenToTripLastMessage(chat.tripId, (msg) => {
@@ -119,11 +139,6 @@ function MessagesContent() {
             const seenBy = Array.isArray(msg?.seenBy) ? msg.seenBy : [];
             const isOpenChat = selectedTripId === chat.tripId;
 
-            // Message is unread if:
-            // 1. Chat is not currently open
-            // 2. Message exists
-            // 3. Message is not from me
-            // 4. I haven't seen it yet
             const unread =
               !isOpenChat &&
               msg &&
@@ -138,11 +153,11 @@ function MessagesContent() {
             };
           });
 
-          // Sort by lastMessageAt - most recent first
+          // Sort by lastMessageAt
           updated.sort((a, b) => {
             const ta = toMillisSafe(a.lastMessageAt);
             const tb = toMillisSafe(b.lastMessageAt);
-            return tb - ta; // Descending order
+            return tb - ta;
           });
 
           return [...updated];
@@ -150,7 +165,10 @@ function MessagesContent() {
       })
     );
 
-    return () => unsubs.forEach((u) => u && u());
+    return () => {
+      console.log("Cleaning up conversation listeners");
+      unsubs.forEach((u) => u && u());
+    };
   }, [user, conversations.length, selectedTripId]);
 
   // Listen to chat messages
@@ -161,14 +179,18 @@ function MessagesContent() {
       return;
     }
 
+    console.log("Opening chat:", selectedTripId);
     setCurrentTripId(selectedTripId);
 
-    // Mark messages as seen when opening chat
-    setTimeout(() => {
+    // Mark as seen after a short delay
+    const markSeenTimer = setTimeout(() => {
+      console.log("Marking messages as seen for:", selectedTripId);
       markTripMessagesSeen(selectedTripId);
     }, 500);
 
     const unsub = listenToTripChat((msgs) => {
+      console.log("Received messages:", msgs.length);
+      
       const hadMessages = lastMessageCountRef.current > 0;
       const newMessageCount = msgs.length;
       const isNewMessage = newMessageCount > lastMessageCountRef.current;
@@ -176,27 +198,29 @@ function MessagesContent() {
       setMessages(msgs);
       lastMessageCountRef.current = newMessageCount;
 
-      // Mark messages as seen
+      // Mark as seen
       if (msgs.length > 0) {
         setTimeout(() => {
           markTripMessagesSeen(selectedTripId);
         }, 300);
       }
 
-      // Clear unread badge immediately for this chat
+      // Clear unread badge
       setConversations((prev) =>
         prev.map((c) =>
           c.tripId === selectedTripId ? { ...c, unread: false } : c
         )
       );
 
-      // Scroll to bottom
+      // Scroll
       if (isNewMessage || !hadMessages) {
         scrollToBottom(true);
       }
     });
 
     return () => {
+      console.log("Cleaning up chat listener");
+      clearTimeout(markSeenTimer);
       unsub();
       setCurrentTripId(null);
       lastMessageCountRef.current = 0;
@@ -206,6 +230,7 @@ function MessagesContent() {
   const openChat = (tripId) => {
     if (tripId === selectedTripId) return;
 
+    console.log("Opening chat:", tripId);
     setSelectedTripId(tripId);
 
     // Clear unread immediately
@@ -215,27 +240,40 @@ function MessagesContent() {
 
     try {
       window.history.pushState(null, "", `/messages?tripId=${tripId}`);
-    } catch {}
+    } catch (e) {
+      console.error("Error updating URL:", e);
+    }
   };
 
   const send = async () => {
     const trimmedInput = input.trim();
-    if (!trimmedInput) return;
+    if (!trimmedInput || sending) return;
 
-    // Clear input immediately for better UX
+    console.log("Sending message:", trimmedInput);
+
+    // Clear input immediately
     setInput("");
+    setSending(true);
 
     try {
       await sendTripMessage(trimmedInput);
+      console.log("Message sent successfully");
       
-      // Force scroll to bottom after sending
+      // Scroll after sending
       setTimeout(() => {
         scrollToBottom(true);
-      }, 100);
+      }, 200);
     } catch (error) {
       console.error("Failed to send message:", error);
+      alert("Failed to send message. Please try again.");
       // Restore input on error
       setInput(trimmedInput);
+    } finally {
+      setSending(false);
+      // Focus input
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
     }
   };
 
@@ -249,13 +287,23 @@ function MessagesContent() {
   const currentChat = conversations.find((c) => c.tripId === selectedTripId);
   const otherUid = currentChat?.otherUid || null;
 
+  if (!user) {
+    return (
+      <div className={styles.page}>
+        <div style={{ textAlign: "center", padding: "40px" }}>
+          <h3>Please login to view messages</h3>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.container}>
         <div className={styles.sidebar}>
           <h3 className={styles.sidebarTitle}>Messages</h3>
 
-          {conversations.length === 0 && user && (
+          {conversations.length === 0 && (
             <div style={{ padding: "20px", textAlign: "center", color: "#65676b" }}>
               No conversations yet
             </div>
@@ -314,10 +362,8 @@ function MessagesContent() {
                 )}
 
                 {messages.map((m) => {
-                  const isMine = m.senderUid === auth?.currentUser?.uid;
+                  const isMine = m.senderUid === user?.uid;
                   const seenBy = Array.isArray(m.seenBy) ? m.seenBy : [];
-
-                  // Check if OTHER person has seen my message
                   const seen = isMine && otherUid && seenBy.includes(otherUid);
 
                   return (
@@ -365,6 +411,7 @@ function MessagesContent() {
               <div className={styles.inputArea}>
                 <div className={styles.inputWrapper}>
                   <input
+                    ref={inputRef}
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
@@ -376,13 +423,14 @@ function MessagesContent() {
                     }}
                     className={styles.inputField}
                     placeholder="Type a message..."
+                    disabled={sending}
                   />
                   <button 
                     onClick={send} 
                     className={styles.sendBtn}
-                    disabled={!input.trim()}
+                    disabled={!input.trim() || sending}
                   >
-                    Send
+                    {sending ? "Sending..." : "Send"}
                   </button>
                 </div>
               </div>
@@ -400,7 +448,7 @@ function MessagesContent() {
 
 export default function MessagesPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div style={{ padding: "40px", textAlign: "center" }}>Loading messages...</div>}>
       <MessagesContent />
     </Suspense>
   );
