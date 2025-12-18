@@ -12,7 +12,7 @@
   "firestore": {
     "database": "(default)",
     "location": "europe-west10",
-    "rules": "db/firestore.rules",
-    "indexes": "db/firestore.indexes.json"
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   }
 }
