@@ -1,6 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
 import styles from "./messages.module.css";
 
 import {
@@ -11,53 +10,22 @@ import {
   auth,
   onAuthChange,
   getUserTrips,
-  getUserOrders,
-  markTripMessagesSeen
+  getUserOrders
 } from "../../lib/db";
 
-function MessagesContent() {
-  const searchParams = useSearchParams();
+export default function MessagesPage() {
   const [user, setUser] = useState(null);
   const [selectedTripId, setSelectedTripId] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
 
   const messagesBoxRef = useRef(null);
-  const lastMessageCountRef = useRef(0);
-
-  const toMillisSafe = (ts) => {
-    if (!ts) return 0;
-    if (typeof ts.toMillis === "function") return ts.toMillis();
-    if (typeof ts.toDate === "function") return ts.toDate().getTime();
-    const d = new Date(ts);
-    return isNaN(d.getTime()) ? 0 : d.getTime();
-  };
-
-  const scrollToBottom = (force = false) => {
-    setTimeout(() => {
-      if (messagesBoxRef.current) {
-        const { scrollTop, scrollHeight, clientHeight } = messagesBoxRef.current;
-        const isNearBottom = scrollHeight - scrollTop - clientHeight < 150;
-        if (force || isNearBottom) {
-          messagesBoxRef.current.scrollTop = messagesBoxRef.current.scrollHeight;
-        }
-      }
-    }, 100);
-  };
 
   useEffect(() => {
     const unsub = onAuthChange(setUser);
     return () => unsub();
   }, []);
-
-  useEffect(() => {
-    const tripIdFromUrl = searchParams.get("tripId");
-    if (tripIdFromUrl && tripIdFromUrl !== selectedTripId) {
-      setSelectedTripId(tripIdFromUrl);
-    }
-  }, [searchParams, selectedTripId]);
 
   useEffect(() => {
     if (!user) {
@@ -70,175 +38,115 @@ function MessagesContent() {
       const bookedOrders = await getUserOrders(user.uid);
 
       const combined = [...postedTrips, ...bookedOrders].filter(
-        (t) => t.status === "booked"
+        t => t.status === "booked"
       );
 
-      const chats = combined.map((trip) => {
+      const chats = combined.map(trip => {
         const isCarrier = trip.carrierUid === user.uid;
         const otherName = isCarrier ? trip.bookedByEmail : trip.carrierName;
-        const otherUid = isCarrier ? trip.bookedByUid : trip.carrierUid;
 
         return {
           tripId: trip.id,
           name: otherName,
-          otherUid,
           route: `${trip.from} → ${trip.to}`,
-          lastMessage: "No messages yet",
+          lastMessage: "Tap to open chat...",
           lastMessageAt: null,
           unread: false,
           avatar: otherName?.[0]?.toUpperCase() || "?"
         };
       });
 
-      const unique = Array.from(new Set(chats.map((c) => c.tripId))).map((id) =>
-        chats.find((c) => c.tripId === id)
+      setConversations(
+        Array.from(new Set(chats.map(c => c.tripId))).map(id =>
+          chats.find(c => c.tripId === id)
+        )
       );
-
-      setConversations(unique);
     };
 
     fetchConversations();
   }, [user]);
 
+  const getSeenKey = (uid, tripId) => `cc_seen_${uid}_${tripId}`;
+
+  const getLastSeen = (uid, tripId) => {
+    try {
+      return Number(localStorage.getItem(getSeenKey(uid, tripId))) || 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const setLastSeen = (uid, tripId) => {
+    try {
+      localStorage.setItem(getSeenKey(uid, tripId), Date.now());
+    } catch {}
+  };
+
   useEffect(() => {
     if (!user || conversations.length === 0) return;
 
-    const unsubs = conversations.map((chat) =>
-      listenToTripLastMessage(chat.tripId, (msg) => {
-        setConversations((prev) => {
-          const updated = prev.map((c) => {
+    const unsubs = conversations.map(chat =>
+      listenToTripLastMessage(chat.tripId, msg => {
+        setConversations(prev =>
+          prev.map(c => {
             if (c.tripId !== chat.tripId) return c;
 
-            const seenBy = Array.isArray(msg?.seenBy) ? msg.seenBy : [];
-            const isOpenChat = selectedTripId === chat.tripId;
-
+            const msgTime = msg?.sentAt?.toMillis?.() || 0;
             const unread =
-              !isOpenChat &&
               msg &&
               msg.senderUid !== user.uid &&
-              !seenBy.includes(user.uid);
+              msgTime > getLastSeen(user.uid, chat.tripId);
 
             return {
               ...c,
-              lastMessage: msg?.text || "No messages yet",
-              lastMessageAt: msg?.sentAt || c.lastMessageAt,
-              unread: Boolean(unread)
+              lastMessage: msg?.text || "Tap to open chat...",
+              lastMessageAt: msg?.sentAt || null,
+              unread
             };
-          });
-
-          updated.sort((a, b) => {
-            const ta = toMillisSafe(a.lastMessageAt);
-            const tb = toMillisSafe(b.lastMessageAt);
-            return tb - ta;
-          });
-
-          return [...updated];
-        });
+          })
+        );
       })
     );
 
-    return () => unsubs.forEach((u) => u && u());
-  }, [user, conversations.length, selectedTripId]);
+    return () => unsubs.forEach(u => u && u());
+  }, [user, conversations.length]);
 
   useEffect(() => {
-    if (!selectedTripId || !user) {
+    if (!selectedTripId) {
       setMessages([]);
-      lastMessageCountRef.current = 0;
       return;
     }
 
     setCurrentTripId(selectedTripId);
 
-    const markSeenTimer = setTimeout(() => {
-      markTripMessagesSeen(selectedTripId);
-    }, 500);
-
-    const unsub = listenToTripChat((msgs) => {
-      const hadMessages = lastMessageCountRef.current > 0;
-      const newMessageCount = msgs.length;
-      const isNewMessage = newMessageCount > lastMessageCountRef.current;
-
+    const unsub = listenToTripChat(msgs => {
       setMessages(msgs);
-      lastMessageCountRef.current = newMessageCount;
-
-      if (msgs.length > 0) {
-        setTimeout(() => {
-          markTripMessagesSeen(selectedTripId);
-        }, 300);
-      }
-
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.tripId === selectedTripId ? { ...c, unread: false } : c
-        )
-      );
-
-      if (isNewMessage || !hadMessages) {
-        scrollToBottom(true);
-      }
+      requestAnimationFrame(() => {
+        if (messagesBoxRef.current) {
+          messagesBoxRef.current.scrollTop =
+            messagesBoxRef.current.scrollHeight;
+        }
+      });
     });
 
     return () => {
-      clearTimeout(markSeenTimer);
       unsub();
       setCurrentTripId(null);
-      lastMessageCountRef.current = 0;
     };
-  }, [selectedTripId, user]);
+  }, [selectedTripId]);
 
-  const openChat = (tripId) => {
-    if (tripId === selectedTripId) return;
-
+  const openChat = tripId => {
+    if (user) setLastSeen(user.uid, tripId);
     setSelectedTripId(tripId);
-
-    setConversations((prev) =>
-      prev.map((c) => (c.tripId === tripId ? { ...c, unread: false } : c))
-    );
-
-    try {
-      window.history.pushState(null, "", `/messages?tripId=${tripId}`);
-    } catch {}
   };
 
-  const send = async () => {
-    const trimmedInput = input.trim();
-    if (!trimmedInput || sending) return;
-
+  const send = () => {
+    if (!input.trim()) return;
+    sendTripMessage(input);
     setInput("");
-    setSending(true);
-
-    try {
-      await sendTripMessage(trimmedInput);
-      setTimeout(() => {
-        scrollToBottom(true);
-      }, 200);
-    } catch (error) {
-      console.error("Failed to send message:", error);
-      setInput(trimmedInput);
-    } finally {
-      setSending(false);
-    }
   };
 
-  const formatTime = (ts) => {
-    if (!ts) return "";
-    const d = ts?.toDate ? ts.toDate() : new Date(ts);
-    if (!d || isNaN(d.getTime())) return "";
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
-
-  const currentChat = conversations.find((c) => c.tripId === selectedTripId);
-  const otherUid = currentChat?.otherUid || null;
-
-  if (!user) {
-    return (
-      <div className={styles.page}>
-        <div style={{ textAlign: "center", padding: "40px" }}>
-          <h3>Please login to view messages</h3>
-        </div>
-      </div>
-    );
-  }
+  const currentChat = conversations.find(c => c.tripId === selectedTripId);
 
   return (
     <div className={styles.page}>
@@ -246,18 +154,14 @@ function MessagesContent() {
         <div className={styles.sidebar}>
           <h3 className={styles.sidebarTitle}>Messages</h3>
 
-          {conversations.length === 0 && (
-            <div style={{ padding: "20px", textAlign: "center", color: "#65676b" }}>
-              No conversations yet
-            </div>
-          )}
-
-          {conversations.map((chat) => (
+          {conversations.map(chat => (
             <div
               key={chat.tripId}
-              className={`${styles.chatItem} ${
-                chat.tripId === selectedTripId ? styles.selectedChat : ""
-              }`}
+              className={
+                chat.tripId === selectedTripId
+                  ? `${styles.chatItem} ${styles.selectedChat}`
+                  : styles.chatItem
+              }
               onClick={() => openChat(chat.tripId)}
             >
               <div className={styles.chatAvatar}>{chat.avatar}</div>
@@ -285,7 +189,9 @@ function MessagesContent() {
           {selectedTripId && currentChat ? (
             <>
               <div className={styles.header}>
-                <div className={styles.headerAvatar}>{currentChat.avatar}</div>
+                <div className={styles.headerAvatar}>
+                  {currentChat.avatar}
+                </div>
                 <div>
                   <p className={styles.headerName}>{currentChat.name}</p>
                   <p className={styles.headerRoute}>{currentChat.route}</p>
@@ -293,21 +199,14 @@ function MessagesContent() {
               </div>
 
               <div className={styles.messages} ref={messagesBoxRef}>
-                {messages.length === 0 && (
-                  <div style={{ 
-                    textAlign: "center", 
-                    color: "#65676b", 
-                    marginTop: "20px",
-                    fontSize: "14px" 
-                  }}>
-                    No messages yet. Start the conversation!
-                  </div>
-                )}
+                {messages.map(m => {
+                  const isMine =
+                    m.senderUid === auth?.currentUser?.uid;
 
-                {messages.map((m) => {
-                  const isMine = m.senderUid === user?.uid;
-                  const seenBy = Array.isArray(m.seenBy) ? m.seenBy : [];
-                  const seen = isMine && otherUid && seenBy.includes(otherUid);
+                  const seen =
+                    isMine &&
+                    m.sentAt?.toMillis?.() <=
+                      getLastSeen(user.uid, selectedTripId);
 
                   return (
                     <div
@@ -316,35 +215,17 @@ function MessagesContent() {
                     >
                       <div
                         className={
-                          isMine ? styles.msgBubbleBlue : styles.msgBubbleGray
+                          isMine
+                            ? styles.msgBubbleBlue
+                            : styles.msgBubbleGray
                         }
                       >
-                        <div className={styles.msgText}>{m.text}</div>
-
-                        <div className={styles.msgMeta}>
-                          <span className={styles.msgClock}>
-                            {formatTime(m.sentAt)}
-                          </span>
-
-                          {isMine && (
-                            <span
-                              className={
-                                seen
-                                  ? styles.statusDoubleSeen
-                                  : styles.statusSingleDelivered
-                              }
-                            >
-                              <svg viewBox="0 0 24 24">
-                                <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" />
-                              </svg>
-                              {seen && (
-                                <svg viewBox="0 0 24 24">
-                                  <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" />
-                                </svg>
-                              )}
-                            </span>
-                          )}
-                        </div>
+                        {m.text}
+                        {isMine && (
+                          <div className={styles.msgTime}>
+                            {seen ? "✔✔ Seen" : "✔ Delivered"}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -356,42 +237,24 @@ function MessagesContent() {
                   <input
                     type="text"
                     value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        send();
-                      }
-                    }}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && send()}
                     className={styles.inputField}
                     placeholder="Type a message..."
-                    disabled={sending}
                   />
-                  <button 
-                    onClick={send} 
-                    className={styles.sendBtn}
-                    disabled={!input.trim() || sending}
-                  >
-                    {sending ? "Sending..." : "Send"}
+                  <button onClick={send} className={styles.sendBtn}>
+                    Send
                   </button>
                 </div>
               </div>
             </>
           ) : (
             <div className={styles.noChatSelected}>
-              <h3>Select a chat to start messaging</h3>
+              <h3>Select a chat</h3>
             </div>
           )}
         </div>
       </div>
     </div>
-  );
-}
-
-export default function MessagesPage() {
-  return (
-    <Suspense fallback={<div style={{ padding: "40px", textAlign: "center" }}>Loading...</div>}>
-      <MessagesContent />
-    </Suspense>
   );
 }
