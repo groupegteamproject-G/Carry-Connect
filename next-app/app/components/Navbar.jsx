@@ -1,27 +1,34 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 
 export default function Navbar() {
   const router = useRouter()
+  const notifRef = useRef(null)
+
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false)
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false)
+
+  const [notifications, setNotifications] = useState([])
+  const [showNotifPopup, setShowNotifPopup] = useState(false)
+
   const [trackedTripIds, setTrackedTripIds] = useState([])
 
   useEffect(() => {
     async function checkAuth() {
       try {
         const { onAuthChange } = await import("../../lib/auth")
-        const unsubscribe = onAuthChange((currentUser) => {
-          setUser(currentUser)
+        const unsub = onAuthChange((u) => {
+          setUser(u)
           setLoading(false)
         })
-        return () => unsubscribe()
+        return () => unsub()
       } catch {
         setLoading(false)
       }
@@ -34,6 +41,7 @@ export default function Navbar() {
       setHasUnreadMessages(false)
       setHasUnreadNotifications(false)
       setTrackedTripIds([])
+      setNotifications([])
       return
     }
 
@@ -54,90 +62,62 @@ export default function Navbar() {
 
     const toMillis = (ts) => {
       if (!ts) return 0
-      if (typeof ts === "number") return ts
       if (ts?.toMillis) return ts.toMillis()
       if (ts?.toDate) return ts.toDate().getTime()
-      const t = new Date(ts).getTime()
-      return Number.isFinite(t) ? t : 0
+      return new Date(ts).getTime()
     }
 
-    async function initUnread() {
+    async function init() {
       try {
         const {
+          getUserTrips,
+          getUserOrders,
           listenToTripLastMessage,
-          listenToNotifications,
-          listenToMyTrips,
-          listenToMyBookings
+          listenToNotifications
         } = await import("../../lib/db")
 
-        const activeTripIds = new Set()
+        const posted = await getUserTrips(user.uid)
+        const booked = await getUserOrders(user.uid)
 
-        const attachTripListenerIfNeeded = (tripId) => {
-          if (!tripId) return
-          if (unreadMap[tripId] !== undefined) return
+        const trips = [...posted, ...booked].filter(t => t.status === "booked")
+        const ids = Array.from(new Set(trips.map(t => t.id)))
+        setTrackedTripIds(ids)
 
-          unreadMap[tripId] = false
-
-          const unsub = listenToTripLastMessage(tripId, (msg) => {
-            if (!mounted) return
-
-            if (!msg) {
-              unreadMap[tripId] = false
-              setHasUnreadMessages(Object.values(unreadMap).some(Boolean))
-              return
-            }
-
-            const msgTime = toMillis(msg.sentAt)
+        unsubs = ids.map(tripId =>
+          listenToTripLastMessage(tripId, (msg) => {
+            if (!mounted || !msg) return
             const lastSeen = getLastSeen(user.uid, tripId)
-
-            if (msg.senderUid !== user.uid && msgTime > lastSeen) {
-              unreadMap[tripId] = true
-            } else {
-              unreadMap[tripId] = false
-            }
-
+            const msgTime = toMillis(msg.sentAt)
+            unreadMap[tripId] = msg.senderUid !== user.uid && msgTime > lastSeen
             setHasUnreadMessages(Object.values(unreadMap).some(Boolean))
           })
+        )
 
-          unsubs.push(unsub)
-        }
-
-        const syncTrips = (trips) => {
-          if (!mounted) return
-
-          const booked = (trips || []).filter((t) => t?.status === "booked")
-          booked.forEach((t) => {
-            if (t?.id) activeTripIds.add(t.id)
-          })
-
-          const ids = Array.from(activeTripIds)
-          setTrackedTripIds(ids)
-
-          ids.forEach(attachTripListenerIfNeeded)
-        }
-
-        const unsubMyTrips = listenToMyTrips(syncTrips)
-        const unsubMyBookings = listenToMyBookings(syncTrips)
-
-        unsubs.push(unsubMyTrips)
-        unsubs.push(unsubMyBookings)
-
-        const unsubNotifications = listenToNotifications((notifs) => {
-          if (!mounted) return
-          const hasUnread = (notifs || []).some((n) => !n.isRead)
-          setHasUnreadNotifications(hasUnread)
+        const unsubNotif = listenToNotifications((list) => {
+          setNotifications(list.slice(0, 12))
+          setHasUnreadNotifications(list.some(n => !n.isRead))
         })
 
-        unsubs.push(unsubNotifications)
+        unsubs.push(unsubNotif)
       } catch {}
     }
 
-    initUnread()
+    init()
     return () => {
       mounted = false
-      unsubs.forEach((u) => u && u())
+      unsubs.forEach(u => u && u())
     }
   }, [user])
+
+  useEffect(() => {
+    function close(e) {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setShowNotifPopup(false)
+      }
+    }
+    document.addEventListener("mousedown", close)
+    return () => document.removeEventListener("mousedown", close)
+  }, [])
 
   const handleLogout = async () => {
     const { logOut } = await import("../../lib/auth")
@@ -146,17 +126,19 @@ export default function Navbar() {
   }
 
   const openMessages = () => {
-    if (!user) return
     const now = Date.now()
-    trackedTripIds.forEach((tripId) => {
-      localStorage.setItem(`cc_seen_${user.uid}_${tripId}`, String(now))
+    trackedTripIds.forEach(id => {
+      localStorage.setItem(`cc_seen_${user.uid}_${id}`, String(now))
     })
     setHasUnreadMessages(false)
     router.push("/messages")
   }
 
-  const openNotifications = () => {
-    router.push("/notifications")
+  const openNotification = async (n) => {
+    const { markNotificationRead } = await import("../../lib/db")
+    await markNotificationRead(n.id)
+    setShowNotifPopup(false)
+    router.push(n.link)
   }
 
   return (
@@ -184,12 +166,36 @@ export default function Navbar() {
       <div className="navbar-right">
         {user ? (
           <>
-            <button className="icon-wrap cc-iconBtn" onClick={openNotifications}>
-              <i className="fa-regular fa-bell icon"></i>
-              {hasUnreadNotifications && <span className="icon-badge"></span>}
-            </button>
+            <div className="icon-wrap cc-iconBtn" ref={notifRef}>
+              <button
+                className="icon-btn-reset"
+                onClick={() => setShowNotifPopup(v => !v)}
+              >
+                <i className="fa-regular fa-bell icon"></i>
+                {hasUnreadNotifications && <span className="icon-badge"></span>}
+              </button>
 
-            <button className="icon-wrap cc-iconBtn" onClick={openMessages}>
+              {showNotifPopup && (
+                <div className="notif-dropdown">
+                  {notifications.length === 0 ? (
+                    <div className="notif-empty">No notifications</div>
+                  ) : (
+                    notifications.map(n => (
+                      <div
+                        key={n.id}
+                        className={`notif-item ${!n.isRead ? "unread" : ""}`}
+                        onClick={() => openNotification(n)}
+                      >
+                        <div className="notif-title">{n.title}</div>
+                        <div className="notif-msg">{n.message}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <button className="icon-wrap cc-iconBtn icon-btn-reset" onClick={openMessages}>
               <i className="fa-regular fa-comments icon"></i>
               {hasUnreadMessages && <span className="icon-badge"></span>}
             </button>
