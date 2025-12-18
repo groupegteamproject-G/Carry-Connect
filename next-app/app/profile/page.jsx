@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./profile.module.css";
 import ConfirmationModal from "../components/ConfirmationModal";
 
 export default function ProfilePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("trips"); // trips, orders, settings
+  const [activeTab, setActiveTab] = useState("trips");
+  const [isOwnProfile, setIsOwnProfile] = useState(true);
+  const [viewedUserId, setViewedUserId] = useState(null);
 
   // Profile Data
   const [formData, setFormData] = useState({
@@ -30,12 +33,12 @@ export default function ProfilePage() {
 
   // Generic Modal State
   const [modalMessage, setModalMessage] = useState(null);
-  const [modalType, setModalType] = useState("success"); // success, error
+  const [modalType, setModalType] = useState("success");
 
   // Data Lists
   const [myTrips, setMyTrips] = useState([]);
   const [myOrders, setMyOrders] = useState([]);
-  const [myReviews, setMyReviews] = useState([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     let unsubscribeAuth;
@@ -45,16 +48,24 @@ export default function ProfilePage() {
         const { onAuthChange, setupRecaptcha } = await import("../../lib/auth");
         const { getUserProfile, getUserTrips, getUserOrders } = await import("../../lib/db");
 
+        // Check if viewing another user's profile
+        const profileUserId = searchParams.get("userId");
+
         unsubscribeAuth = onAuthChange(async (currentUser) => {
           if (!currentUser) {
             router.push("/auth");
             return;
           }
 
-          // Fetch full profile from Firestore
-          const profile = await getUserProfile(currentUser.uid);
+          // Determine whose profile to show
+          const targetUserId = profileUserId || currentUser.uid;
+          setIsOwnProfile(!profileUserId || profileUserId === currentUser.uid);
+          setViewedUserId(targetUserId);
+
+          // Fetch profile
+          const profile = await getUserProfile(targetUserId);
           const userData = profile || {
-            uid: currentUser.uid,
+            uid: targetUserId,
             email: currentUser.email,
             name: currentUser.displayName || "",
             phone: currentUser.phoneNumber || "",
@@ -63,33 +74,35 @@ export default function ProfilePage() {
 
           setUser({
             ...userData,
-            providerData: currentUser.providerData
+            providerData: currentUser.providerData,
+            currentUserId: currentUser.uid
           });
-          setFormData({
-            name: userData.name || "",
-            email: userData.email || "",
-            phone: userData.phone || "",
-            bio: userData.bio || "",
-            location: userData.location || ""
-          });
-          setPhoneVerified(!!userData.phoneVerified); // Ensure boolean
+
+          if (isOwnProfile || !profileUserId) {
+            setFormData({
+              name: userData.name || "",
+              email: userData.email || "",
+              phone: userData.phone || "",
+              bio: userData.bio || "",
+              location: userData.location || ""
+            });
+          }
+          
+          setPhoneVerified(!!userData.phoneVerified);
 
           // Fetch Trips and Orders
-          const trips = await getUserTrips(currentUser.uid);
+          const trips = await getUserTrips(targetUserId);
           setMyTrips(trips);
 
-          const orders = await getUserOrders(currentUser.uid);
+          const orders = await getUserOrders(targetUserId);
           setMyOrders(orders);
-
-          // Fetch Reviews
-          const { getUserReviews } = await import("../../lib/db");
-          const reviews = await getUserReviews(currentUser.uid);
-          setMyReviews(reviews);
 
           setLoading(false);
 
-          // Setup Recaptcha for phone verification
-          setupRecaptcha("recaptcha-container");
+          // Setup Recaptcha only for own profile
+          if (isOwnProfile || !profileUserId) {
+            setupRecaptcha("recaptcha-container");
+          }
         });
       } catch (error) {
         console.error("Error initializing profile:", error);
@@ -100,17 +113,16 @@ export default function ProfilePage() {
     init();
     return () => {
       if (unsubscribeAuth) unsubscribeAuth();
-      // Clear recaptcha on unmount
       if (window.recaptchaVerifier) {
         window.recaptchaVerifier.clear();
         window.recaptchaVerifier = null;
       }
     };
-  }, [router]);
+  }, [router, searchParams]);
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !isOwnProfile) return;
 
     try {
       const { updateUserProfile } = await import("../../lib/db");
@@ -137,20 +149,14 @@ export default function ProfilePage() {
 
     try {
       const { linkPhoneNumber, setupRecaptcha } = await import("../../lib/auth");
-      const { auth } = await import("../../lib/firebase"); // Import auth instance
+      const { auth } = await import("../../lib/firebase");
 
       const appVerifier = setupRecaptcha("recaptcha-container");
       if (!appVerifier) {
         throw new Error("Recaptcha not initialized");
       }
 
-      // Format phone number if needed (basic check)
       let phoneToVerify = formData.phone;
-      if (!phoneToVerify.startsWith("+")) {
-        // Assume US/Spain for now or ask user, but for test we use +1
-        // If user didn't add +, warn them or try to add it?
-        // Better to let Firebase handle validation or show error
-      }
 
       if (!auth.currentUser) {
         throw new Error("User not authenticated");
@@ -162,7 +168,7 @@ export default function ProfilePage() {
     } catch (error) {
       console.error("Error sending code:", error);
       let msg = "Failed to send code.";
-      if (error.code === 'auth/invalid-phone-number') msg = "Invalid phone number format. Use +[CountryCode][Number] (e.g. +15555555555)";
+      if (error.code === 'auth/invalid-phone-number') msg = "Invalid phone number format. Use +[CountryCode][Number]";
       if (error.code === 'auth/operation-not-allowed') msg = "Phone auth not enabled in Firebase Console.";
       setVerifyError(msg);
     }
@@ -172,10 +178,8 @@ export default function ProfilePage() {
     if (!verificationId || !verificationCode) return;
 
     try {
-      // Confirm the code
       await verificationId.confirm(verificationCode);
 
-      // Update Firestore
       const { updateUserProfile } = await import("../../lib/db");
       await updateUserProfile(user.uid, {
         phone: formData.phone,
@@ -185,7 +189,6 @@ export default function ProfilePage() {
       setPhoneVerified(true);
       setIsVerifyingPhone(false);
       setVerifySuccess("Phone verified successfully!");
-
       setModalType("success");
       setModalMessage("Phone verified successfully!");
     } catch (error) {
@@ -214,6 +217,8 @@ export default function ProfilePage() {
       return;
     }
 
+    setUploadingImage(true);
+
     try {
       const { uploadProfileImage, updateUserProfile } = await import("../../lib/db");
       const downloadURL = await uploadProfileImage(user.uid, file);
@@ -225,14 +230,15 @@ export default function ProfilePage() {
     } catch (error) {
       console.error("Error uploading image:", error);
       setModalType("error");
-      setModalMessage("Failed to upload image.");
+      setModalMessage("Failed to upload image. Please try again.");
+    } finally {
+      setUploadingImage(false);
     }
   };
 
   const handleVerifyEmail = async () => {
     try {
       const { sendEmailVerification } = await import("../../lib/auth");
-      // We need the current auth user object, not just our state user
       const { auth } = await import("../../lib/firebase");
       if (auth.currentUser) {
         await sendEmailVerification(auth.currentUser);
@@ -273,117 +279,206 @@ export default function ProfilePage() {
   };
 
   if (loading) {
-    return <div className={styles.loading}>Loading profile...</div>;
+    return (
+      <div className={styles.loading}>
+        <div className={styles.spinner}></div>
+        <p>Loading profile...</p>
+      </div>
+    );
   }
 
   if (!user) return null;
 
   const isGoogleAuth = user.providerData?.some(p => p.providerId === 'google.com');
+  const memberSince = user.createdAt?.seconds 
+    ? new Date(user.createdAt.seconds * 1000).getFullYear() 
+    : new Date().getFullYear();
 
   return (
     <main className={styles.container}>
-      <div className={styles.header}>
-        <div className={styles.avatar}>
-          {user.photoURL ? <img src={user.photoURL} alt="Profile" /> : (user.name?.[0] || "U")}
-          <label className={styles.avatarOverlay}>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              style={{ display: 'none' }}
-            />
-            <i className="fa-solid fa-camera"></i>
-          </label>
+      {/* Hero Section */}
+      <div className={styles.hero}>
+        <div className={styles.heroContent}>
+          <div className={styles.avatarSection}>
+            <div className={styles.avatar}>
+              {uploadingImage && (
+                <div className={styles.avatarLoading}>
+                  <div className={styles.spinner}></div>
+                </div>
+              )}
+              {user.photoURL ? (
+                <img src={user.photoURL} alt="Profile" />
+              ) : (
+                <div className={styles.avatarPlaceholder}>
+                  {user.name?.[0]?.toUpperCase() || "U"}
+                </div>
+              )}
+              {isOwnProfile && (
+                <label className={styles.avatarOverlay}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                    style={{ display: 'none' }}
+                  />
+                  <i className="fa-solid fa-camera"></i>
+                  <span>Change Photo</span>
+                </label>
+              )}
+            </div>
+          </div>
+
+          <div className={styles.userInfo}>
+            <h1>{user.name || "User"}</h1>
+            <p className={styles.email}>
+              <i className="fa-solid fa-envelope"></i> {user.email}
+            </p>
+            {user.location && (
+              <p className={styles.location}>
+                <i className="fa-solid fa-location-dot"></i> {user.location}
+              </p>
+            )}
+            {user.bio && <p className={styles.bio}>{user.bio}</p>}
+            
+            <div className={styles.badges}>
+              {(user.emailVerified || isGoogleAuth) && (
+                <span className={styles.verifiedBadge}>
+                  <i className="fa-solid fa-circle-check"></i> Email Verified
+                </span>
+              )}
+              {!isOwnProfile && phoneVerified && (
+                <span className={styles.verifiedBadge}>
+                  <i className="fa-solid fa-circle-check"></i> Phone Verified
+                </span>
+              )}
+              <span className={styles.memberBadge}>
+                <i className="fa-solid fa-calendar-days"></i> Member since {memberSince}
+              </span>
+            </div>
+          </div>
+
+          {isOwnProfile && (
+            <button onClick={handleLogout} className={styles.logoutBtn}>
+              <i className="fa-solid fa-right-from-bracket"></i>
+              Log Out
+            </button>
+          )}
         </div>
-        <div className={styles.userInfo}>
-          <h1>{user.name || "User"}</h1>
-          <p>{user.email}</p>
-          <div className={styles.badges}>
-            {user.emailVerified || isGoogleAuth ? (
-              <span className={styles.verifiedBadge}><i className="fa-solid fa-check"></i> Email Verified</span>
-            ) : (
-              <button onClick={handleVerifyEmail} className={styles.unverifiedBadge} title="Click to verify email">
-                <i className="fa-solid fa-triangle-exclamation"></i> Email Pending
-              </button>
-            )}
-            {phoneVerified ? (
-              <span className={styles.verifiedBadge}><i className="fa-solid fa-check"></i> Phone Verified</span>
-            ) : (
-              <button onClick={handleVerifyPhone} className={styles.unverifiedBadge} title="Click to verify phone">
-                <i className="fa-solid fa-triangle-exclamation"></i> Phone Pending
-              </button>
-            )}
+      </div>
+
+      {/* Stats Grid */}
+      <div className={styles.statsGrid}>
+        <div className={styles.statCard}>
+          <div className={styles.statIcon} style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+            <i className="fa-solid fa-plane-departure"></i>
+          </div>
+          <div className={styles.statInfo}>
+            <h3>{myTrips.length}</h3>
+            <p>Trips Posted</p>
           </div>
         </div>
-        <button onClick={handleLogout} className={styles.logoutBtn}>Log Out</button>
+
+        <div className={styles.statCard}>
+          <div className={styles.statIcon} style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
+            <i className="fa-solid fa-box"></i>
+          </div>
+          <div className={styles.statInfo}>
+            <h3>{myOrders.length}</h3>
+            <p>Orders Made</p>
+          </div>
+        </div>
+
+        <div className={styles.statCard}>
+          <div className={styles.statIcon} style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}>
+            <i className="fa-solid fa-handshake"></i>
+          </div>
+          <div className={styles.statInfo}>
+            <h3>{myTrips.filter(t => t.status === 'completed').length}</h3>
+            <p>Completed</p>
+          </div>
+        </div>
+
+        <div className={styles.statCard}>
+          <div className={styles.statIcon} style={{ background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' }}>
+            <i className="fa-solid fa-clock"></i>
+          </div>
+          <div className={styles.statInfo}>
+            <h3>{myTrips.filter(t => t.status === 'active' || !t.status).length}</h3>
+            <p>Active</p>
+          </div>
+        </div>
       </div>
 
-      {/* Stats Section */}
-      <div className={styles.statsGrid}>
-        <div className={styles.statBox}>
-          <i className="fa-solid fa-plane"></i>
-          <h3>{myTrips.length}</h3>
-          <p>Trips Posted</p>
-        </div>
-        <div className={styles.statBoxGreen}>
-          <i className="fa-solid fa-box"></i>
-          <h3>{myOrders.length}</h3>
-          <p>Orders Made</p>
-        </div>
-        <div className={styles.statBoxYellow}>
-          <i className="fa-solid fa-star"></i>
-          <h3>
-            {myReviews.length > 0
-              ? (myReviews.reduce((acc, r) => acc + r.rating, 0) / myReviews.length).toFixed(1)
-              : "-"}
-          </h3>
-          <p>Rating</p>
-        </div>
-        <div className={styles.statBoxPurple}>
-          <i className="fa-solid fa-calendar"></i>
-          <h3>{new Date(user.createdAt?.seconds * 1000).getFullYear() || 2024}</h3>
-          <p>Member Since</p>
+      {/* Tabs */}
+      <div className={styles.tabsContainer}>
+        <div className={styles.tabs}>
+          <button
+            className={`${styles.tab} ${activeTab === 'trips' ? styles.active : ''}`}
+            onClick={() => setActiveTab('trips')}
+          >
+            <i className="fa-solid fa-plane"></i>
+            My Trips
+          </button>
+          <button
+            className={`${styles.tab} ${activeTab === 'orders' ? styles.active : ''}`}
+            onClick={() => setActiveTab('orders')}
+          >
+            <i className="fa-solid fa-shopping-bag"></i>
+            My Orders
+          </button>
+          {isOwnProfile && (
+            <button
+              className={`${styles.tab} ${activeTab === 'settings' ? styles.active : ''}`}
+              onClick={() => setActiveTab('settings')}
+            >
+              <i className="fa-solid fa-gear"></i>
+              Settings
+            </button>
+          )}
         </div>
       </div>
 
-      <div className={styles.tabs}>
-        <button
-          className={`${styles.tab} ${activeTab === 'trips' ? styles.active : ''}`}
-          onClick={() => setActiveTab('trips')}
-        >
-          My Trips
-        </button>
-        <button
-          className={`${styles.tab} ${activeTab === 'orders' ? styles.active : ''}`}
-          onClick={() => setActiveTab('orders')}
-        >
-          My Orders
-        </button>
-        <button
-          className={`${styles.tab} ${activeTab === 'reviews' ? styles.active : ''}`}
-          onClick={() => setActiveTab('reviews')}
-        >
-          Reviews
-        </button>
-        <button
-          className={`${styles.tab} ${activeTab === 'settings' ? styles.active : ''}`}
-          onClick={() => setActiveTab('settings')}
-        >
-          Settings
-        </button>
-      </div>
-
+      {/* Content */}
       <div className={styles.content}>
         {activeTab === 'trips' && (
-          <div className={styles.grid}>
+          <div className={styles.cardsGrid}>
             {myTrips.length === 0 ? (
-              <p>No trips posted yet.</p>
+              <div className={styles.emptyState}>
+                <i className="fa-solid fa-plane-slash"></i>
+                <h3>No trips yet</h3>
+                <p>{isOwnProfile ? "Start posting your trips to help others!" : "This user hasn't posted any trips yet."}</p>
+              </div>
             ) : (
               myTrips.map(trip => (
-                <div key={trip.id} className={styles.card}>
-                  <h3>{trip.from} → {trip.to}</h3>
-                  <p>{new Date(trip.date).toLocaleDateString()}</p>
-                  <span className={styles.status}>{trip.status || 'Active'}</span>
+                <div key={trip.id} className={styles.tripCard}>
+                  <div className={styles.cardHeader}>
+                    <h3>
+                      <i className="fa-solid fa-location-dot"></i>
+                      {trip.from}
+                    </h3>
+                    <i className="fa-solid fa-arrow-right" style={{ color: '#0084ff' }}></i>
+                    <h3>
+                      <i className="fa-solid fa-location-dot"></i>
+                      {trip.to}
+                    </h3>
+                  </div>
+                  <div className={styles.cardBody}>
+                    <p>
+                      <i className="fa-regular fa-calendar"></i>
+                      {trip.date?.toDate ? trip.date.toDate().toLocaleDateString() : new Date(trip.date).toLocaleDateString()}
+                    </p>
+                    <p>
+                      <i className="fa-solid fa-weight-hanging"></i>
+                      {trip.maxWeight || 'N/A'} kg max
+                    </p>
+                  </div>
+                  <div className={styles.cardFooter}>
+                    <span className={`${styles.status} ${styles['status-' + (trip.status || 'active')]}`}>
+                      {trip.status || 'Active'}
+                    </span>
+                    <span className={styles.price}>${trip.pricePerKg}/kg</span>
+                  </div>
                 </div>
               ))
             )}
@@ -391,135 +486,153 @@ export default function ProfilePage() {
         )}
 
         {activeTab === 'orders' && (
-          <div className={styles.grid}>
+          <div className={styles.cardsGrid}>
             {myOrders.length === 0 ? (
-              <p>No orders yet.</p>
+              <div className={styles.emptyState}>
+                <i className="fa-solid fa-box-open"></i>
+                <h3>No orders yet</h3>
+                <p>{isOwnProfile ? "Start booking trips to send your packages!" : "This user hasn't made any orders yet."}</p>
+              </div>
             ) : (
               myOrders.map(order => (
-                <div key={order.id} className={styles.card}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <h3 style={{ margin: 0 }}>{order.from} → {order.to}</h3>
-                    <span className={`${styles.status} ${order.status === 'accepted' ? styles.statusAccepted : order.status === 'rejected' ? styles.statusRejected : ''}`}>
-                      {order.status || "Pending"}
-                    </span>
+                <div key={order.id} className={styles.orderCard}>
+                  <div className={styles.cardHeader}>
+                    <h3>
+                      <i className="fa-solid fa-location-dot"></i>
+                      {order.from}
+                    </h3>
+                    <i className="fa-solid fa-arrow-right" style={{ color: '#f5576c' }}></i>
+                    <h3>
+                      <i className="fa-solid fa-location-dot"></i>
+                      {order.to}
+                    </h3>
                   </div>
-                  <p style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <i className="fa-regular fa-calendar"></i>
-                    {order.date?.toDate ? order.date.toDate().toLocaleDateString() : new Date(order.date).toLocaleDateString()}
-                  </p>
-                  <p style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <i className="fa-solid fa-box"></i> {order.packageSize}
-                  </p>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px' }}>
-                    <span style={{ fontWeight: 'bold', fontSize: '18px' }}>${order.price}</span>
+                  <div className={styles.cardBody}>
+                    <p>
+                      <i className="fa-regular fa-calendar"></i>
+                      {order.date?.toDate ? order.date.toDate().toLocaleDateString() : new Date(order.date).toLocaleDateString()}
+                    </p>
+                    <p>
+                      <i className="fa-solid fa-box"></i>
+                      {order.packageSize}
+                    </p>
+                  </div>
+                  <div className={styles.cardFooter}>
+                    <span className={`${styles.status} ${styles['status-' + (order.status || 'pending')]}`}>
+                      {order.status || 'Pending'}
+                    </span>
+                    <span className={styles.price}>${order.price}</span>
+                  </div>
+                  {isOwnProfile && (
                     <button
                       onClick={() => router.push('/my-orders')}
-                      style={{ background: '#2d5bff', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                      className={styles.viewDetailsBtn}
                     >
                       View Details
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {activeTab === 'reviews' && (
-          <div className={styles.reviewsSection}>
-            {myReviews.length === 0 ? (
-              <p>No reviews yet.</p>
-            ) : (
-              myReviews.map(review => (
-                <div key={review.id} className={styles.reviewCard}>
-                  <div className={styles.reviewHeader}>
-                    <h4>{review.reviewerName || "Anonymous"}</h4>
-                    <span className={styles.reviewDate}>
-                      {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : ""}
-                    </span>
-                  </div>
-                  <div className={styles.reviewStars}>
-                    {[...Array(5)].map((_, i) => (
-                      <i
-                        key={i}
-                        className={`fa-solid fa-star ${i < review.rating ? styles.starFilled : styles.starEmpty}`}
-                        style={{ color: i < review.rating ? '#ffb400' : '#ddd' }}
-                      ></i>
-                    ))}
-                  </div>
-                  <p className={styles.reviewText}>{review.comment}</p>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {activeTab === 'settings' && (
-          <div className={styles.settingsForm}>
-            <h2>Edit Profile</h2>
-            <form onSubmit={handleUpdateProfile}>
-              <div className={styles.inputGroup}>
-                <label>Full Name</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
-
-              <div className={styles.inputGroup}>
-                <label>Phone Number</label>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="+1234567890"
-                  />
-                  {!phoneVerified && (
-                    <button type="button" onClick={handleVerifyPhone} className={styles.verifyBtn}>
-                      Verify
+                      <i className="fa-solid fa-arrow-right"></i>
                     </button>
                   )}
                 </div>
-              </div>
+              ))
+            )}
+          </div>
+        )}
 
-              <div className={styles.inputGroup}>
-                <label>Bio</label>
-                <textarea
-                  value={formData.bio}
-                  onChange={e => setFormData({ ...formData, bio: e.target.value })}
-                  rows="3"
-                />
-              </div>
+        {activeTab === 'settings' && isOwnProfile && (
+          <div className={styles.settingsSection}>
+            <div className={styles.settingsCard}>
+              <h2>
+                <i className="fa-solid fa-user-pen"></i>
+                Edit Profile
+              </h2>
+              <form onSubmit={handleUpdateProfile}>
+                <div className={styles.formGrid}>
+                  <div className={styles.inputGroup}>
+                    <label>
+                      <i className="fa-solid fa-user"></i>
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={e => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Enter your name"
+                    />
+                  </div>
 
-              <div className={styles.inputGroup}>
-                <label>Location</label>
-                <input
-                  type="text"
-                  value={formData.location}
-                  onChange={e => setFormData({ ...formData, location: e.target.value })}
-                />
-              </div>
+                  <div className={styles.inputGroup}>
+                    <label>
+                      <i className="fa-solid fa-location-dot"></i>
+                      Location
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.location}
+                      onChange={e => setFormData({ ...formData, location: e.target.value })}
+                      placeholder="City, Country"
+                    />
+                  </div>
+                </div>
 
-              <button type="submit" className={styles.saveBtn}>Save Changes</button>
-            </form>
+                <div className={styles.inputGroup}>
+                  <label>
+                    <i className="fa-solid fa-phone"></i>
+                    Phone Number
+                    {phoneVerified && <span className={styles.verifiedLabel}><i className="fa-solid fa-circle-check"></i> Verified</span>}
+                  </label>
+                  <div className={styles.phoneInputGroup}>
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="+1234567890"
+                    />
+                    {!phoneVerified && (
+                      <button type="button" onClick={handleVerifyPhone} className={styles.verifyBtn}>
+                        <i className="fa-solid fa-shield-halved"></i>
+                        Verify
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className={styles.inputGroup}>
+                  <label>
+                    <i className="fa-solid fa-align-left"></i>
+                    Bio
+                  </label>
+                  <textarea
+                    value={formData.bio}
+                    onChange={e => setFormData({ ...formData, bio: e.target.value })}
+                    rows="4"
+                    placeholder="Tell others about yourself..."
+                  />
+                </div>
+
+                <button type="submit" className={styles.saveBtn}>
+                  <i className="fa-solid fa-floppy-disk"></i>
+                  Save Changes
+                </button>
+              </form>
+            </div>
 
             <div className={styles.dangerZone}>
-              <h3>Danger Zone</h3>
+              <h3>
+                <i className="fa-solid fa-triangle-exclamation"></i>
+                Danger Zone
+              </h3>
               <p>Once you delete your account, there is no going back. Please be certain.</p>
               <button onClick={handleDeleteAccount} className={styles.deleteBtn}>
-                <i className="fa-solid fa-trash"></i> Delete Account
+                <i className="fa-solid fa-trash"></i>
+                Delete Account Permanently
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Recaptcha Container */}
       <div id="recaptcha-container"></div>
 
-      {/* Generic Success/Error Modal */}
       <ConfirmationModal
         isOpen={!!modalMessage}
         onClose={() => setModalMessage(null)}
@@ -529,53 +642,56 @@ export default function ProfilePage() {
         isAlert={true}
       />
 
-      {/* Phone Verification Modal - Kept custom for now as it has inputs */}
       {isVerifyingPhone && (
         <div className={styles.modalOverlay}>
           <div className={styles.modalContent}>
-            <h3 className={styles.modalTitle}>Verify Phone Number</h3>
+            <h3 className={styles.modalTitle}>
+              <i className="fa-solid fa-mobile-screen-button"></i>
+              Verify Phone Number
+            </h3>
             <p className={styles.modalText}>
-              Enter the 6-digit code sent to {formData.phone}
+              Enter the 6-digit code sent to <strong>{formData.phone}</strong>
             </p>
 
             {verifyError && (
-              <div className={styles.errorText} style={{ marginBottom: '15px', color: '#dc3545' }}>
+              <div className={styles.errorBox}>
+                <i className="fa-solid fa-circle-xmark"></i>
                 {verifyError}
-                <button
-                  onClick={() => setIsVerifyingPhone(false)}
-                  style={{ display: 'block', marginTop: '10px', background: 'none', border: 'none', color: '#666', textDecoration: 'underline', cursor: 'pointer' }}
-                >
+                <button onClick={() => setIsVerifyingPhone(false)} className={styles.closeErrorBtn}>
                   Close
                 </button>
               </div>
             )}
-            {verifySuccess && <p className={styles.successText}>{verifySuccess}</p>}
+            {verifySuccess && (
+              <div className={styles.successBox}>
+                <i className="fa-solid fa-circle-check"></i>
+                {verifySuccess}
+              </div>
+            )}
 
             {!verificationId && !verifyError ? (
-              <div className={styles.loadingSpinner}>Sending code...</div>
+              <div className={styles.loadingSpinner}>
+                <div className={styles.spinner}></div>
+                <p>Sending code...</p>
+              </div>
             ) : (
               !verifyError && (
                 <>
                   <input
                     type="text"
-                    className={styles.modalInput}
-                    placeholder="123456"
+                    className={styles.codeInput}
+                    placeholder="000000"
                     value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value)}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
                     maxLength={6}
                   />
                   <div className={styles.modalActions}>
-                    <button
-                      className={styles.cancelBtn}
-                      onClick={() => setIsVerifyingPhone(false)}
-                    >
+                    <button className={styles.cancelBtn} onClick={() => setIsVerifyingPhone(false)}>
                       Cancel
                     </button>
-                    <button
-                      className={styles.confirmBtn}
-                      onClick={handleConfirmPhone}
-                    >
-                      Verify
+                    <button className={styles.confirmBtn} onClick={handleConfirmPhone}>
+                      <i className="fa-solid fa-check"></i>
+                      Verify Code
                     </button>
                   </div>
                 </>
