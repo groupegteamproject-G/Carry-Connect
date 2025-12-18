@@ -86,9 +86,10 @@ export default function Navbar() {
         unsubs = ids.map(tripId =>
           listenToTripLastMessage(tripId, (msg) => {
             if (!mounted || !msg) return
-            const lastSeen = getLastSeen(user.uid, tripId)
-            const msgTime = toMillis(msg.sentAt)
-            unreadMap[tripId] = msg.senderUid !== user.uid && msgTime > lastSeen
+
+            const seenBy = Array.isArray(msg.seenBy) ? msg.seenBy : []
+            unreadMap[tripId] = msg.senderUid !== user.uid && !seenBy.includes(user.uid)
+
             setHasUnreadMessages(Object.values(unreadMap).some(Boolean))
           })
         )
@@ -125,12 +126,11 @@ export default function Navbar() {
     router.push("/")
   }
 
-  const openMessages = () => {
-    const now = Date.now()
-    trackedTripIds.forEach(id => {
-      localStorage.setItem(`cc_seen_${user.uid}_${id}`, String(now))
-    })
-    setHasUnreadMessages(false)
+  const openMessages = async () => {
+    try {
+      const { markTripMessagesSeen } = await import("../../lib/db")
+      await Promise.all((trackedTripIds || []).map(id => markTripMessagesSeen(id)))
+    } catch {}
     router.push("/messages")
   }
 
