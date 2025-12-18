@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -12,9 +12,6 @@ export default function Navbar() {
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false)
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false)
   const [trackedTripIds, setTrackedTripIds] = useState([])
-  const [notifications, setNotifications] = useState([])
-  const [notifOpen, setNotifOpen] = useState(false)
-  const notifRef = useRef(null)
 
   useEffect(() => {
     async function checkAuth() {
@@ -33,22 +30,10 @@ export default function Navbar() {
   }, [])
 
   useEffect(() => {
-    function onDocClick(e) {
-      if (!notifOpen) return
-      if (!notifRef.current) return
-      if (!notifRef.current.contains(e.target)) setNotifOpen(false)
-    }
-    document.addEventListener("mousedown", onDocClick)
-    return () => document.removeEventListener("mousedown", onDocClick)
-  }, [notifOpen])
-
-  useEffect(() => {
     if (!user) {
       setHasUnreadMessages(false)
       setHasUnreadNotifications(false)
       setTrackedTripIds([])
-      setNotifications([])
-      setNotifOpen(false)
       return
     }
 
@@ -76,39 +61,26 @@ export default function Navbar() {
       return Number.isFinite(t) ? t : 0
     }
 
-    const formatNotifTime = (createdAt) => {
-      const t = toMillis(createdAt)
-      if (!t) return ""
-      const diff = Date.now() - t
-      const mins = Math.floor(diff / 60000)
-      if (mins < 1) return "Just now"
-      if (mins < 60) return `${mins}m`
-      const hrs = Math.floor(mins / 60)
-      if (hrs < 24) return `${hrs}h`
-      const days = Math.floor(hrs / 24)
-      return `${days}d`
-    }
-
     async function initUnread() {
       try {
         const {
-          getUserTrips,
-          getUserOrders,
           listenToTripLastMessage,
           listenToNotifications,
-          markNotificationRead
+          listenToMyTrips,
+          listenToMyBookings
         } = await import("../../lib/db")
 
-        const postedTrips = await getUserTrips(user.uid)
-        const bookedOrders = await getUserOrders(user.uid)
+        const activeTripIds = new Set()
 
-        const trips = [...postedTrips, ...bookedOrders].filter((t) => t.status === "booked")
-        const uniqueTripIds = Array.from(new Set(trips.map((t) => t.id)))
-        setTrackedTripIds(uniqueTripIds)
+        const attachTripListenerIfNeeded = (tripId) => {
+          if (!tripId) return
+          if (unreadMap[tripId] !== undefined) return
 
-        unsubs = uniqueTripIds.map((tripId) =>
-          listenToTripLastMessage(tripId, (msg) => {
+          unreadMap[tripId] = false
+
+          const unsub = listenToTripLastMessage(tripId, (msg) => {
             if (!mounted) return
+
             if (!msg) {
               unreadMap[tripId] = false
               setHasUnreadMessages(Object.values(unreadMap).some(Boolean))
@@ -118,34 +90,45 @@ export default function Navbar() {
             const msgTime = toMillis(msg.sentAt)
             const lastSeen = getLastSeen(user.uid, tripId)
 
-            if (msg.senderUid !== user.uid && msgTime > lastSeen) unreadMap[tripId] = true
-            else unreadMap[tripId] = false
+            if (msg.senderUid !== user.uid && msgTime > lastSeen) {
+              unreadMap[tripId] = true
+            } else {
+              unreadMap[tripId] = false
+            }
 
             setHasUnreadMessages(Object.values(unreadMap).some(Boolean))
           })
-        )
+
+          unsubs.push(unsub)
+        }
+
+        const syncTrips = (trips) => {
+          if (!mounted) return
+
+          const booked = (trips || []).filter((t) => t?.status === "booked")
+          booked.forEach((t) => {
+            if (t?.id) activeTripIds.add(t.id)
+          })
+
+          const ids = Array.from(activeTripIds)
+          setTrackedTripIds(ids)
+
+          ids.forEach(attachTripListenerIfNeeded)
+        }
+
+        const unsubMyTrips = listenToMyTrips(syncTrips)
+        const unsubMyBookings = listenToMyBookings(syncTrips)
+
+        unsubs.push(unsubMyTrips)
+        unsubs.push(unsubMyBookings)
 
         const unsubNotifications = listenToNotifications((notifs) => {
           if (!mounted) return
-          setNotifications(notifs.slice(0, 6))
-          setHasUnreadNotifications(notifs.some((n) => !n.isRead))
+          const hasUnread = (notifs || []).some((n) => !n.isRead)
+          setHasUnreadNotifications(hasUnread)
         })
 
         unsubs.push(unsubNotifications)
-
-        const originalOpen = () => setNotifOpen((v) => !v)
-        const openAndAutoRead = () => {
-          setNotifOpen((v) => !v)
-          setHasUnreadNotifications(false)
-          try {
-            notifications
-              .filter((n) => n && !n.isRead && n.id)
-              .forEach((n) => markNotificationRead(n.id))
-          } catch {}
-        }
-
-        Navbar.__openNotif = openAndAutoRead
-        Navbar.__formatNotifTime = formatNotifTime
       } catch {}
     }
 
@@ -154,7 +137,7 @@ export default function Navbar() {
       mounted = false
       unsubs.forEach((u) => u && u())
     }
-  }, [user, notifications])
+  }, [user])
 
   const handleLogout = async () => {
     const { logOut } = await import("../../lib/auth")
@@ -172,47 +155,8 @@ export default function Navbar() {
     router.push("/messages")
   }
 
-  const toggleNotifications = async () => {
-    try {
-      const { markNotificationRead } = await import("../../lib/db")
-      setNotifOpen((v) => !v)
-      setHasUnreadNotifications(false)
-      notifications
-        .filter((n) => n && !n.isRead && n.id)
-        .forEach((n) => markNotificationRead(n.id))
-    } catch {
-      setNotifOpen((v) => !v)
-    }
-  }
-
-  const openNotifLink = async (n) => {
-    try {
-      const { markNotificationRead } = await import("../../lib/db")
-      if (n?.id) await markNotificationRead(n.id)
-    } catch {}
-    setNotifOpen(false)
-    if (n?.link) router.push(n.link)
-  }
-
-  const notifTime = (createdAt) => {
-    const t =
-      typeof createdAt === "number"
-        ? createdAt
-        : createdAt?.toMillis
-        ? createdAt.toMillis()
-        : createdAt?.toDate
-        ? createdAt.toDate().getTime()
-        : new Date(createdAt || 0).getTime()
-
-    if (!t) return ""
-    const diff = Date.now() - t
-    const mins = Math.floor(diff / 60000)
-    if (mins < 1) return "Just now"
-    if (mins < 60) return `${mins}m`
-    const hrs = Math.floor(mins / 60)
-    if (hrs < 24) return `${hrs}h`
-    const days = Math.floor(hrs / 24)
-    return `${days}d`
+  const openNotifications = () => {
+    router.push("/notifications")
   }
 
   return (
@@ -240,150 +184,17 @@ export default function Navbar() {
       <div className="navbar-right">
         {user ? (
           <>
-            <div className="icon-wrap cc-iconBtn" style={{ position: "relative" }} ref={notifRef}>
-              <button
-                type="button"
-                className="icon-wrap cc-iconBtn"
-                onClick={toggleNotifications}
-                style={{ border: "none", background: "transparent", padding: 0 }}
-                aria-label="Notifications"
-              >
-                <i className="fa-regular fa-bell icon"></i>
-                {hasUnreadNotifications && <span className="icon-badge"></span>}
-              </button>
+            <button className="icon-wrap cc-iconBtn" onClick={openNotifications}>
+              <i className="fa-regular fa-bell icon"></i>
+              {hasUnreadNotifications && <span className="icon-badge"></span>}
+            </button>
 
-              {notifOpen && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "46px",
-                    right: 0,
-                    width: "320px",
-                    background: "#fff",
-                    border: "1px solid rgba(0,0,0,0.08)",
-                    borderRadius: "12px",
-                    boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
-                    overflow: "hidden",
-                    zIndex: 9999
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: "12px 14px",
-                      borderBottom: "1px solid rgba(0,0,0,0.06)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between"
-                    }}
-                  >
-                    <strong style={{ fontSize: "14px" }}>Notifications</strong>
-                    <button
-                      type="button"
-                      onClick={() => setNotifOpen(false)}
-                      style={{
-                        border: "none",
-                        background: "transparent",
-                        cursor: "pointer",
-                        fontSize: "14px",
-                        color: "#666"
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-
-                  {notifications.length === 0 ? (
-                    <div style={{ padding: "14px", color: "#777", fontSize: "13px" }}>
-                      No notifications yet.
-                    </div>
-                  ) : (
-                    <div style={{ maxHeight: "360px", overflowY: "auto" }}>
-                      {notifications.map((n) => (
-                        <button
-                          key={n.id}
-                          type="button"
-                          onClick={() => openNotifLink(n)}
-                          style={{
-                            width: "100%",
-                            textAlign: "left",
-                            padding: "12px 14px",
-                            border: "none",
-                            background: n.isRead ? "#fff" : "#f5f7ff",
-                            cursor: "pointer",
-                            display: "flex",
-                            gap: "10px",
-                            borderBottom: "1px solid rgba(0,0,0,0.06)"
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "34px",
-                              height: "34px",
-                              borderRadius: "999px",
-                              background: "#c7d9ff",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontWeight: 700
-                            }}
-                          >
-                            <i className="fa-regular fa-bell" />
-                          </div>
-
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
-                              <div style={{ fontSize: "13px", fontWeight: 700, color: "#111" }}>
-                                {n.title || "Notification"}
-                              </div>
-                              <div style={{ fontSize: "12px", color: "#777", whiteSpace: "nowrap" }}>
-                                {notifTime(n.createdAt)}
-                              </div>
-                            </div>
-                            <div style={{ fontSize: "12px", color: "#444", marginTop: "4px" }}>
-                              {n.message || ""}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <div style={{ padding: "10px 14px", background: "#fff" }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNotifOpen(false)
-                        router.push("/notifications")
-                      }}
-                      style={{
-                        width: "100%",
-                        border: "1px solid rgba(0,0,0,0.12)",
-                        background: "#fff",
-                        borderRadius: "10px",
-                        padding: "10px",
-                        cursor: "pointer",
-                        fontWeight: 700
-                      }}
-                    >
-                      See all
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <button
-              type="button"
-              className="icon-wrap cc-iconBtn"
-              onClick={openMessages}
-              style={{ border: "none", background: "transparent" }}
-              aria-label="Messages"
-            >
+            <button className="icon-wrap cc-iconBtn" onClick={openMessages}>
               <i className="fa-regular fa-comments icon"></i>
               {hasUnreadMessages && <span className="icon-badge"></span>}
             </button>
 
-            <Link href="/profile" className="icon-wrap cc-iconBtn" aria-label="Profile">
+            <Link href="/profile" className="icon-wrap cc-iconBtn">
               <i className="fa-regular fa-user icon"></i>
             </Link>
 
