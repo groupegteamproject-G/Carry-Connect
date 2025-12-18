@@ -248,23 +248,33 @@
   align-items: center;
 }
 
-/* Telegram/WhatsApp-style checks using SVG (no emojis) */
+/* ✅ Telegram/WhatsApp-style checks using SVG (no emojis) */
 .statusSingleDelivered,
 .statusDoubleSeen {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
 }
 
+/* size + base color */
 .statusSingleDelivered svg,
 .statusDoubleSeen svg {
   width: 14px;
   height: 14px;
+}
+
+/* Delivered (single check) */
+.statusSingleDelivered svg {
   fill: rgba(255,255,255,0.9);
 }
 
+/* Seen (double check) - lighter blue-ish like apps */
 .statusDoubleSeen svg {
-  fill: rgba(200, 235, 255, 0.95);
+  fill: rgba(200,235,255,0.95);
+}
+
+/* ✅ IMPORTANT FIX: make double checks tight/overlapped (not far apart) */
+.statusDoubleSeen svg:first-child {
+  margin-right: -6px;
 }
 
 /* ================= INPUT ================= */
