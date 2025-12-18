@@ -432,9 +432,11 @@ export const sendTripMessage = async (text) => {
     text,
     sender: auth.currentUser.displayName || auth.currentUser.email,
     senderUid: auth.currentUser.uid,
-    sentAt: serverTimestamp()
+    sentAt: serverTimestamp(),
+    seenBy: [auth.currentUser.uid]
   });
 };
+
 
 export const listenToTripChat = (callback) => {
   if (!currentTripId) return () => { };
@@ -482,6 +484,39 @@ export const listenToTripReadAt = (tripId, callback) => {
     const data = snap.exists() ? snap.data() : null;
     callback(data?.readAt || {});
   });
+};
+export const markTripMessagesSeen = async (tripId) => {
+  if (!tripId || !auth.currentUser) return;
+
+  try {
+    const uid = auth.currentUser.uid;
+
+    const q = query(
+      collection(db, "trips", tripId, "messages"),
+      orderBy("sentAt", "desc"),
+      limit(30)
+    );
+
+    const snap = await getDocs(q);
+
+    const updates = [];
+    snap.docs.forEach((d) => {
+      const data = d.data();
+      const seenBy = Array.isArray(data.seenBy) ? data.seenBy : [];
+
+      if (data.senderUid !== uid && !seenBy.includes(uid)) {
+        updates.push(
+          updateDoc(doc(db, "trips", tripId, "messages", d.id), {
+            seenBy: [...seenBy, uid]
+          })
+        );
+      }
+    });
+
+    if (updates.length) {
+      await Promise.all(updates);
+    }
+  } catch {}
 };
 
 console.log("CarryConnect db.js loaded");
