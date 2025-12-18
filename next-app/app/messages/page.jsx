@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./messages.module.css";
 
 import {
@@ -14,6 +15,9 @@ import {
 } from "../../lib/db";
 
 export default function MessagesPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [user, setUser] = useState(null);
   const [selectedTripId, setSelectedTripId] = useState(null);
   const [conversations, setConversations] = useState([]);
@@ -26,6 +30,13 @@ export default function MessagesPage() {
     const unsub = onAuthChange(setUser);
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    const tripIdFromUrl = searchParams.get("tripId");
+    if (tripIdFromUrl && tripIdFromUrl !== selectedTripId) {
+      setSelectedTripId(tripIdFromUrl);
+    }
+  }, [searchParams, selectedTripId]);
 
   useEffect(() => {
     if (!user) {
@@ -137,7 +148,7 @@ export default function MessagesPage() {
 
   const openChat = tripId => {
     if (user) setLastSeen(user.uid, tripId);
-    setSelectedTripId(tripId);
+    router.push(`/messages?tripId=${tripId}`);
   };
 
   const send = () => {
@@ -223,7 +234,17 @@ export default function MessagesPage() {
                         {m.text}
                         {isMine && (
                           <div className={styles.msgTime}>
-                            {seen ? "✔✔ Seen" : "✔ Delivered"}
+                            {seen ? (
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                                <i className="fa-solid fa-check-double" style={{ fontSize: "12px", opacity: 0.95 }}></i>
+                                <span style={{ fontSize: "12px", opacity: 0.95 }}>Seen</span>
+                              </span>
+                            ) : (
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                                <i className="fa-solid fa-check" style={{ fontSize: "12px", opacity: 0.9 }}></i>
+                                <span style={{ fontSize: "12px", opacity: 0.9 }}>Delivered</span>
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
