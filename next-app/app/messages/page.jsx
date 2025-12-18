@@ -159,6 +159,47 @@ function MessagesContent() {
 
   const currentChat = conversations.find(c => c.tripId === selectedTripId);
 
+  const formatTime = (ts) => {
+    const d = ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : null);
+    if (!d || isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const dayKey = (ts) => {
+    const d = ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : null);
+    if (!d || isNaN(d.getTime())) return "unknown";
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return String(x.getTime());
+  };
+
+  const formatDayLabel = (ts) => {
+    const d = ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : null);
+    if (!d || isNaN(d.getTime())) return "";
+    const today = new Date();
+    const t0 = new Date(today); t0.setHours(0,0,0,0);
+    const d0 = new Date(d); d0.setHours(0,0,0,0);
+    const diffDays = Math.round((t0 - d0) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    return d0.toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" });
+  };
+
+  const formatSidebarTime = (ts) => {
+    if (!ts) return "";
+    const d = ts?.toDate ? ts.toDate() : new Date(ts);
+    if (!d || isNaN(d.getTime())) return "";
+    const today = new Date();
+    const t0 = new Date(today); t0.setHours(0,0,0,0);
+    const d0 = new Date(d); d0.setHours(0,0,0,0);
+    const diffDays = Math.round((t0 - d0) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    if (diffDays === 1) return "Yesterday";
+    return d0.toLocaleDateString([], { day: "2-digit", month: "short" });
+  };
+
+  let lastRenderedDay = null;
+
   return (
     <div className={styles.page}>
       <div className={styles.container}>
@@ -192,6 +233,9 @@ function MessagesContent() {
                   {chat.lastMessage}
                 </p>
               </div>
+              <div className={styles.chatTime}>
+                {formatSidebarTime(chat.lastMessageAt)}
+              </div>
             </div>
           ))}
         </div>
@@ -211,32 +255,54 @@ function MessagesContent() {
 
               <div className={styles.messages} ref={messagesBoxRef}>
                 {messages.map(m => {
-                  const isMine =
-                    m.senderUid === auth?.currentUser?.uid;
+                  const isMine = m.senderUid === auth?.currentUser?.uid;
 
-                  const seen =
-                    isMine &&
-                    m.sentAt?.toMillis?.() <=
-                      getLastSeen(user.uid, selectedTripId);
+                  const msgMillis = m.sentAt?.toMillis?. ? m.sentAt.toMillis() : (m.sentAt ? new Date(m.sentAt).getTime() : 0);
+                  const seen = isMine && msgMillis <= getLastSeen(user.uid, selectedTripId);
+
+                  const thisDay = dayKey(m.sentAt);
+                  const showDay = thisDay !== lastRenderedDay;
+                  if (showDay) lastRenderedDay = thisDay;
 
                   return (
-                    <div
-                      key={m.id}
-                      className={isMine ? styles.msgBoxRight : styles.msgBox}
-                    >
+                    <div key={m.id}>
+                      {showDay && thisDay !== "unknown" && (
+                        <div className={styles.dayDivider}>
+                          <span className={styles.dayDividerPill}>{formatDayLabel(m.sentAt)}</span>
+                        </div>
+                      )}
+
                       <div
-                        className={
-                          isMine
-                            ? styles.msgBubbleBlue
-                            : styles.msgBubbleGray
-                        }
+                        className={isMine ? styles.msgBoxRight : styles.msgBox}
                       >
-                        {m.text}
-                        {isMine && (
-                          <div className={styles.msgTime}>
-                            {seen ? "Seen" : "Delivered"}
+                        <div
+                          className={
+                            isMine
+                              ? styles.msgBubbleBlue
+                              : styles.msgBubbleGray
+                          }
+                        >
+                          <div className={styles.msgText}>{m.text}</div>
+
+                          <div className={styles.msgMeta}>
+                            <span className={styles.msgClock}>{formatTime(m.sentAt)}</span>
+
+                            {isMine && (
+                              <span className={styles.msgStatus}>
+                                <span className={seen ? styles.statusDoubleSeen : styles.statusSingleDelivered}>
+                                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M9.0 16.2L4.8 12l-1.4 1.4L9.0 19 21 7l-1.4-1.4z"></path>
+                                  </svg>
+                                  {seen && (
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                      <path d="M9.0 16.2L4.8 12l-1.4 1.4L9.0 19 21 7l-1.4-1.4z"></path>
+                                    </svg>
+                                  )}
+                                </span>
+                              </span>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
                     </div>
                   );
