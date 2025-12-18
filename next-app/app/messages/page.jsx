@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./messages.module.css";
 
@@ -14,7 +14,7 @@ import {
   getUserOrders
 } from "../../lib/db";
 
-export default function MessagesPage() {
+function MessagesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -234,17 +234,7 @@ export default function MessagesPage() {
                         {m.text}
                         {isMine && (
                           <div className={styles.msgTime}>
-                            {seen ? (
-                              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                                <i className="fa-solid fa-check-double" style={{ fontSize: "12px", opacity: 0.95 }}></i>
-                                <span style={{ fontSize: "12px", opacity: 0.95 }}>Seen</span>
-                              </span>
-                            ) : (
-                              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                                <i className="fa-solid fa-check" style={{ fontSize: "12px", opacity: 0.9 }}></i>
-                                <span style={{ fontSize: "12px", opacity: 0.9 }}>Delivered</span>
-                              </span>
-                            )}
+                            {seen ? "Seen" : "Delivered"}
                           </div>
                         )}
                       </div>
@@ -277,5 +267,13 @@ export default function MessagesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={<div />}>
+      <MessagesContent />
+    </Suspense>
   );
 }
