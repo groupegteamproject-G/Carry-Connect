@@ -10,7 +10,8 @@ import {
   auth,
   onAuthChange,
   getUserTrips,
-  getUserOrders
+  getUserOrders,
+  getUserProfile
 } from "../../lib/db";
 
 export default function MessagesPage() {
@@ -42,26 +43,33 @@ export default function MessagesPage() {
         (trip) => trip.status === "booked"
       );
 
-      const formattedChats = combinedChats.map(trip => {
-        const isCarrier = trip.carrierUid === user.uid;
-        const otherPersonName = isCarrier
-          ? trip.bookedByEmail
-          : trip.carrierName;
+      const formattedChats = await Promise.all(
+        combinedChats.map(async (trip) => {
+          const isCarrier = trip.carrierUid === user.uid;
+          const otherUid = isCarrier ? trip.bookedByUid : trip.carrierUid;
 
-        const route = `${trip.from} → ${trip.to}`;
+          let otherName = "User";
+          let otherEmail = isCarrier ? trip.bookedByEmail : trip.carrierEmail;
 
-        return {
-          tripId: trip.id,
-          name: otherPersonName,
-          route,
-          lastMessage: "Tap to open chat...",
-          lastMessageAt: null,
-          lastMessageSenderUid: null,
-          unread: false,
-          avatar: otherPersonName ? otherPersonName[0].toUpperCase() : "?",
-          tripData: trip
-        };
-      });
+          const profile = otherUid ? await getUserProfile(otherUid) : null;
+          if (profile?.name) otherName = profile.name;
+          else if (otherEmail) otherName = otherEmail;
+
+          const route = `${trip.from} → ${trip.to}`;
+
+          return {
+            tripId: trip.id,
+            name: otherName,
+            route,
+            lastMessage: "Tap to open chat...",
+            lastMessageAt: null,
+            lastMessageSenderUid: null,
+            unread: false,
+            avatar: otherName ? otherName[0].toUpperCase() : "?",
+            tripData: trip
+          };
+        })
+      );
 
       const uniqueChats = Array.from(
         new Set(formattedChats.map(c => c.tripId))
@@ -96,14 +104,11 @@ export default function MessagesPage() {
     const unsubs = conversations.map((chat) => {
       return listenToTripLastMessage(chat.tripId, (msg) => {
         setConversations((prev) => {
-          const next = prev.map((c) => {
+          return prev.map((c) => {
             if (c.tripId !== chat.tripId) return c;
 
             const lastSeen = getLastSeen(user.uid, chat.tripId);
-
-            const msgTime = msg?.sentAt?.toMillis
-              ? msg.sentAt.toMillis()
-              : 0;
+            const msgTime = msg?.sentAt?.toMillis ? msg.sentAt.toMillis() : 0;
 
             const unread =
               !!msg &&
@@ -119,7 +124,6 @@ export default function MessagesPage() {
               unread
             };
           });
-          return next;
         });
       });
     });
@@ -176,9 +180,7 @@ export default function MessagesPage() {
 
           {user ? (
             conversations.length === 0 ? (
-              <div className={styles.emptyState}>
-                No active bookings or trips.
-              </div>
+              <div className={styles.emptyState}>No active bookings or trips.</div>
             ) : (
               conversations.map((chat) => (
                 <div
@@ -189,7 +191,6 @@ export default function MessagesPage() {
                       : styles.chatItem
                   }
                   onClick={() => openChat(chat.tripId)}
-                  style={{ cursor: "pointer" }}
                 >
                   <div className={styles.chatAvatar}>{chat.avatar}</div>
                   <div className={styles.chatInfo}>
@@ -206,21 +207,11 @@ export default function MessagesPage() {
                       {chat.lastMessage}
                     </p>
                   </div>
-                  <p className={styles.chatTime}>
-                    {chat.lastMessageAt
-                      ? new Date(chat.lastMessageAt.toDate()).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit"
-                        })
-                      : ""}
-                  </p>
                 </div>
               ))
             )
           ) : (
-            <div className={styles.emptyState}>
-              Please login to see messages.
-            </div>
+            <div className={styles.emptyState}>Please login to see messages.</div>
           )}
         </div>
 
@@ -228,9 +219,7 @@ export default function MessagesPage() {
           {selectedTripId && currentChat ? (
             <>
               <div className={styles.header}>
-                <div className={styles.headerAvatar}>
-                  {currentChat.avatar}
-                </div>
+                <div className={styles.headerAvatar}>{currentChat.avatar}</div>
                 <div>
                   <p className={styles.headerName}>{currentChat.name}</p>
                   <p className={styles.headerRoute}>{currentChat.route}</p>
@@ -238,65 +227,42 @@ export default function MessagesPage() {
               </div>
 
               <div className={styles.messages}>
-                {messages.length === 0 ? (
-                  <div className={styles.emptyState}>
-                    Start the conversation
-                  </div>
-                ) : (
-                  messages.map((m) => (
+                {messages.map((m) => (
+                  <div
+                    key={m.id}
+                    className={
+                      m.senderUid === auth?.currentUser?.uid
+                        ? styles.msgBoxRight
+                        : styles.msgBox
+                    }
+                  >
                     <div
-                      key={m.id}
                       className={
                         m.senderUid === auth?.currentUser?.uid
-                          ? styles.msgBoxRight
-                          : styles.msgBox
+                          ? styles.msgBubbleBlue
+                          : styles.msgBubbleGray
                       }
                     >
-                      <span
-                        className={
-                          m.senderUid === auth?.currentUser?.uid
-                            ? styles.msgSenderRight
-                            : styles.msgSender
-                        }
-                      >
-                        {m.senderUid === auth?.currentUser?.uid
-                          ? "You"
-                          : m.sender?.[0]}
-                      </span>
-                      <div
-                        className={
-                          m.senderUid === auth?.currentUser?.uid
-                            ? styles.msgBubbleBlue
-                            : styles.msgBubbleGray
-                        }
-                      >
-                        {m.text}
-                      </div>
+                      {m.text}
                     </div>
-                  ))
-                )}
+                  </div>
+                ))}
                 <div ref={messagesEndRef} />
               </div>
 
               <div className={styles.inputArea}>
-                <div className={styles.inputWrapper}>
-                  <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && send()}
-                    placeholder="Type a message..."
-                    className={styles.inputField}
-                  />
-                  <button onClick={send} className={styles.sendBtn}>
-                    Send
-                  </button>
-                </div>
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && send()}
+                  placeholder="Type a message..."
+                />
+                <button onClick={send}>Send</button>
               </div>
             </>
           ) : (
             <div className={styles.noChatSelected}>
-              <h3>Select a chat to start messaging</h3>
+              <h3>Select a chat</h3>
             </div>
           )}
         </div>
