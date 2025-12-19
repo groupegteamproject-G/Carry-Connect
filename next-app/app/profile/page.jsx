@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./profile.module.css";
 import ConfirmationModal from "../components/ConfirmationModal";
 
-export default function ProfilePage() {
+function ProfileContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState(null);
@@ -14,7 +14,6 @@ export default function ProfilePage() {
   const [isOwnProfile, setIsOwnProfile] = useState(true);
   const [viewedUserId, setViewedUserId] = useState(null);
 
-  // Profile Data
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -23,7 +22,6 @@ export default function ProfilePage() {
     location: ""
   });
 
-  // Phone Verification State
   const [isVerifyingPhone, setIsVerifyingPhone] = useState(false);
   const [verificationId, setVerificationId] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
@@ -31,11 +29,9 @@ export default function ProfilePage() {
   const [verifyError, setVerifyError] = useState("");
   const [verifySuccess, setVerifySuccess] = useState("");
 
-  // Generic Modal State
   const [modalMessage, setModalMessage] = useState(null);
   const [modalType, setModalType] = useState("success");
 
-  // Data Lists
   const [myTrips, setMyTrips] = useState([]);
   const [myOrders, setMyOrders] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -48,7 +44,6 @@ export default function ProfilePage() {
         const { onAuthChange, setupRecaptcha } = await import("../../lib/auth");
         const { getUserProfile, getUserTrips, getUserOrders } = await import("../../lib/db");
 
-        // Check if viewing another user's profile
         const profileUserId = searchParams.get("userId");
 
         unsubscribeAuth = onAuthChange(async (currentUser) => {
@@ -57,12 +52,10 @@ export default function ProfilePage() {
             return;
           }
 
-          // Determine whose profile to show
           const targetUserId = profileUserId || currentUser.uid;
           setIsOwnProfile(!profileUserId || profileUserId === currentUser.uid);
           setViewedUserId(targetUserId);
 
-          // Fetch profile
           const profile = await getUserProfile(targetUserId);
           const userData = profile || {
             uid: targetUserId,
@@ -90,7 +83,6 @@ export default function ProfilePage() {
           
           setPhoneVerified(!!userData.phoneVerified);
 
-          // Fetch Trips and Orders
           const trips = await getUserTrips(targetUserId);
           setMyTrips(trips);
 
@@ -99,7 +91,6 @@ export default function ProfilePage() {
 
           setLoading(false);
 
-          // Setup Recaptcha only for own profile
           if (isOwnProfile || !profileUserId) {
             setupRecaptcha("recaptcha-container");
           }
@@ -296,7 +287,6 @@ export default function ProfilePage() {
 
   return (
     <main className={styles.container}>
-      {/* Hero Section */}
       <div className={styles.hero}>
         <div className={styles.heroContent}>
           <div className={styles.avatarSection}>
@@ -367,7 +357,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Stats Grid */}
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
           <div className={styles.statIcon} style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
@@ -410,7 +399,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className={styles.tabsContainer}>
         <div className={styles.tabs}>
           <button
@@ -439,7 +427,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Content */}
       <div className={styles.content}>
         {activeTab === 'trips' && (
           <div className={styles.cardsGrid}>
@@ -701,5 +688,13 @@ export default function ProfilePage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<div className={styles.loading}><div className={styles.spinner}></div><p>Loading...</p></div>}>
+      <ProfileContent />
+    </Suspense>
   );
 }
