@@ -109,106 +109,192 @@
 /* ---------- INDIVIDUAL CARD ---------- */
 .card {
   background: white;
-  padding: 18px;
-  border-radius: 12px;
-  border: 1px solid #e5e5e5;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  padding: 20px;
+  border-radius: 16px;
+  border: 2px solid #e5e5e5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  border-color: #667eea;
 }
 
 .cardHeader {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   position: relative;
+  align-items: flex-start;
+  margin-bottom: 16px;
 }
 
 .avatar {
-  width: 42px;
-  height: 42px;
-  background: #d8e2ff;
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+  border: 3px solid #f0f0f0;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.headerInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardName {
+  font-size: 18px;
+  margin: 0 0 6px 0;
+  font-weight: 700;
+  color: #2d3748;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.youBadge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #667eea;
+  background: #e6f2ff;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.routeInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.routeText {
+  font-size: 15px;
+  font-weight: 600;
+  color: #4a5568;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.routeText::before {
+  content: '📍';
+  font-size: 14px;
+}
+
+.cardDate {
+  font-size: 13px;
+  color: #718096;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cardDate::before {
+  content: '📅';
+  font-size: 12px;
 }
 
 .badge {
   position: absolute;
   right: 0;
   top: 0;
-  background: #e9efff;
-  padding: 4px 10px;
-  border-radius: 8px;
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
   font-size: 12px;
-}
-
-.cardName {
-  font-size: 16px;
-  margin: 0;
   font-weight: 600;
-}
-
-.cardSub {
-  font-size: 13px;
-  color: #555;
-}
-
-.cardDate {
-  font-size: 12px;
-  color: #777;
-  margin-top: 2px;
+  box-shadow: 0 2px 8px rgba(79, 172, 254, 0.3);
 }
 
 .cardBody {
-  margin-top: 12px;
-  color: #444;
+  margin: 16px 0;
+  color: #4a5568;
   font-size: 14px;
+  line-height: 1.6;
 }
 
-.cardBody i {
-  margin-right: 6px;
-  color: #777;
+.packageSize {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: #2d3748;
+  margin: 0 0 8px 0;
+}
+
+.packageSize i {
+  color: #667eea;
+  font-size: 16px;
+}
+
+.description {
+  color: #718096;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 8px 0 0 0;
 }
 
 .cardFooter {
-  margin-top: 14px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .price {
-  font-size: 20px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 700;
+  color: #667eea;
+  margin: 0;
 }
 
 .bookBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 14px;
-  background: #295bff;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  border-radius: 8px;
+  border-radius: 10px;
   border: none;
   cursor: pointer;
   text-decoration: none;
   font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
 }
 
 .bookBtn:hover {
-  background: #204acc;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 .bookBtnDisabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 14px;
-  background: #ccc;
-  color: white;
-  border-radius: 8px;
+  padding: 10px 20px;
+  background: #e2e8f0;
+  color: #a0aec0;
+  border-radius: 10px;
   border: none;
   cursor: not-allowed;
   text-decoration: none;
   font-size: 14px;
-  opacity: 0.5;
+  font-weight: 600;
 }
 
 /* Make the search box behave nicely on this page */
@@ -216,7 +302,6 @@
   max-width: 1150px;
   margin: 0 auto 20px !important;
   position: static !important;
-  /* in case home version used absolute/relative */
 }
 
 /* Filters Panel */
@@ -239,7 +324,6 @@
     opacity: 0;
     transform: translateY(-10px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
@@ -306,12 +390,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 15px 25px;
+  padding: 18px 28px;
 }
 
 .cardList .cardHeader {
   flex: 2;
   align-items: center;
+  margin-bottom: 0;
+}
+
+.cardList .avatar {
+  width: 48px;
+  height: 48px;
+  font-size: 20px;
 }
 
 .cardList .headerInfo {
@@ -322,8 +413,9 @@
 
 .cardList .routeInfo {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .cardList .routeText {
@@ -340,12 +432,13 @@
 
 .cardList .description {
   display: none;
-  /* Hide description in list view for compactness */
 }
 
 .cardList .cardFooter {
   flex: 1;
   margin: 0;
+  padding: 0;
+  border: none;
   justify-content: flex-end;
   gap: 20px;
 }
@@ -353,12 +446,6 @@
 .cardList .badge {
   position: static;
   margin-left: 15px;
-}
-
-.youBadge {
-  font-size: 12px;
-  color: #667eea;
-  margin-left: 8px;
 }
 
 .emptyState {
@@ -391,4 +478,26 @@
   border-radius: 8px;
   border: none;
   cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .cardsGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .cardList {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .cardList .cardHeader,
+  .cardList .cardBody,
+  .cardList .cardFooter {
+    width: 100%;
+  }
+  
+  .cardList .cardFooter {
+    justify-content: space-between;
+  }
 }
