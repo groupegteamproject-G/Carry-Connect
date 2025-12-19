@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import styles from "./messages.module.css";
 
 import {
@@ -17,6 +17,7 @@ import {
 
 function MessagesContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [user, setUser] = useState(null);
   const [selectedTripId, setSelectedTripId] = useState(null);
@@ -182,6 +183,12 @@ function MessagesContent() {
     }
   };
 
+  const handleViewProfile = (uid) => {
+    if (uid) {
+      router.push(`/profile/${uid}`);
+    }
+  };
+
   const currentChat = conversations.find(c => c.tripId === selectedTripId);
   const otherUid = currentChat?.otherUid;
 
@@ -271,6 +278,14 @@ function MessagesContent() {
                   <p className={styles.headerName}>{currentChat.name}</p>
                   <p className={styles.headerRoute}>{currentChat.route}</p>
                 </div>
+                <button 
+                  className={styles.viewProfileBtn}
+                  onClick={() => handleViewProfile(currentChat.otherUid)}
+                  title="View Profile"
+                >
+                  <i className="fa-solid fa-user"></i>
+                  View Profile
+                </button>
               </header>
 
               <section className={styles.messages} ref={messagesBoxRef}>
@@ -285,7 +300,12 @@ function MessagesContent() {
                       className={mine ? styles.msgRight : styles.msgLeft}
                     >
                       {showAvatar && (
-                        <div className={styles.msgAvatar}>
+                        <div 
+                          className={styles.msgAvatar}
+                          onClick={() => handleViewProfile(currentChat.otherUid)}
+                          style={{ cursor: 'pointer' }}
+                          title="View Profile"
+                        >
                           {currentChat.avatar}
                         </div>
                       )}
