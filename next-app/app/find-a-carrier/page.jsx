@@ -2,13 +2,11 @@
 
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import SearchBox from "../components/SearchBox";
 import styles from "./find.module.css";
 
 function FindCarrierContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [carriers, setCarriers] = useState([]);
   const [filteredCarriers, setFilteredCarriers] = useState([]);
@@ -20,27 +18,6 @@ function FindCarrierContent() {
 
   const [priceRange, setPriceRange] = useState(1000);
   const [selectedTransport, setSelectedTransport] = useState("All");
-
-  // Generate consistent avatar color based on name
-  const getAvatarColor = (name) => {
-    if (!name) return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-    
-    const colors = [
-      'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-      'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-      'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-      'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-      'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
-      'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-      'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
-      'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
-      'linear-gradient(135deg, #ff6e7f 0%, #bfe9ff 100%)'
-    ];
-    
-    const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return colors[hash % colors.length];
-  };
 
   useEffect(() => {
     let unsubscribeAuth;
@@ -101,54 +78,34 @@ function FindCarrierContent() {
     setFilteredCarriers(filtered);
   }, [carriers, searchParams, priceRange, selectedTransport]);
 
-  const getTransportIcon = (type) => {
-    switch(type) {
-      case 'Flight': return 'fa-plane';
-      case 'Train': return 'fa-train';
-      case 'Car': return 'fa-car';
-      case 'Ship': return 'fa-ship';
-      default: return 'fa-circle';
-    }
-  };
-
   if (loading) {
-    return (
-      <div className={styles.loading}>
-        <div className={styles.spinner}></div>
-        <p>Finding carriers...</p>
-      </div>
-    );
+    return <div className={styles.loading}>Loading carriers...</div>;
   }
 
   return (
     <>
       <SearchBox className={styles.searchBoxFind} />
 
-      <div className={styles.topBar}>
-        <div className={styles.topActions}>
-          <button
-            className={`${styles.filterBtn} ${showFilters ? styles.active : ""}`}
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <i className="fa-solid fa-sliders"></i>
-            <span>Filters</span>
-          </button>
-          <button
-            className={styles.viewToggle}
-            onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-          >
-            <i className={`fa-solid ${viewMode === "grid" ? "fa-list" : "fa-grid-2"}`}></i>
-          </button>
-        </div>
+      <div className={styles.topActions}>
+        <button
+          className={`${styles.filterBtn} ${showFilters ? styles.active : ""}`}
+          onClick={() => setShowFilters(!showFilters)}
+        >
+          <i className="fa-solid fa-filter"></i> Filters
+        </button>
+        <button
+          className={styles.listBtn}
+          onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+        >
+          <i className={`fa-solid ${viewMode === "grid" ? "fa-list" : "fa-border-all"}`}></i>
+          {viewMode === "grid" ? " List View" : " Grid View"}
+        </button>
       </div>
 
       {showFilters && (
         <div className={styles.filtersPanel}>
           <div className={styles.filterGroup}>
-            <label>
-              <i className="fa-solid fa-dollar-sign"></i>
-              Max Price: <strong>${priceRange}</strong>
-            </label>
+            <label>Max Price: ${priceRange}</label>
             <input
               type="range"
               min="0"
@@ -159,20 +116,17 @@ function FindCarrierContent() {
             />
           </div>
           <div className={styles.filterGroup}>
-            <label>
-              <i className="fa-solid fa-shuttle-space"></i>
-              Transport Type
-            </label>
+            <label>Transport Type</label>
             <select
               value={selectedTransport}
               onChange={(e) => setSelectedTransport(e.target.value)}
               className={styles.selectInput}
             >
               <option value="All">All Types</option>
-              <option value="Flight">✈️ Flight</option>
-              <option value="Train">🚆 Train</option>
-              <option value="Car">🚗 Car</option>
-              <option value="Ship">🚢 Ship</option>
+              <option value="Flight">Flight</option>
+              <option value="Train">Train</option>
+              <option value="Car">Car</option>
+              <option value="Ship">Ship</option>
             </select>
           </div>
           <button
@@ -181,30 +135,20 @@ function FindCarrierContent() {
               setSelectedTransport("All");
             }}
             className={styles.clearFiltersBtn}
-            title="Reset Filters"
           >
             <i className="fa-solid fa-rotate-right"></i>
           </button>
         </div>
       )}
 
-      <div className={styles.resultsHeader}>
-        <h2 className={styles.sectionTitle}>
-          <i className="fa-solid fa-truck-fast"></i>
-          Available Carriers
-        </h2>
-        <p className={styles.resultCount}>
-          <strong>{filteredCarriers.length}</strong> {filteredCarriers.length === 1 ? 'carrier' : 'carriers'} found
-        </p>
-      </div>
+      <h2 className={styles.sectionTitle}>Available Carriers</h2>
+      <p className={styles.resultCount}>{filteredCarriers.length} carriers found</p>
 
       {filteredCarriers.length === 0 ? (
         <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>
-            <i className="fa-solid fa-magnifying-glass"></i>
-          </div>
-          <h3 className={styles.emptyTitle}>No carriers found</h3>
-          <p className={styles.emptyText}>Try adjusting your search criteria or filters to find more options.</p>
+          <div className={styles.emptyIcon}>📦</div>
+          <h3 className={styles.emptyTitle}>No trips found</h3>
+          <p className={styles.emptyText}>Try adjusting your search or filters.</p>
           <button
             onClick={() => {
               setPriceRange(1000);
@@ -212,101 +156,55 @@ function FindCarrierContent() {
             }}
             className={styles.clearBtn}
           >
-            <i className="fa-solid fa-filter-circle-xmark"></i>
-            Clear All Filters
+            Clear Filters
           </button>
         </div>
       ) : (
         <div className={viewMode === "grid" ? styles.cardsGrid : styles.cardsList}>
           {filteredCarriers.map((carrier) => {
             const isMyTrip = user && carrier.carrierUid === user.uid;
-            const carrierName = carrier.carrierName || carrier.userName || carrier.name || "Anonymous";
-            const avatarLetter = carrierName.charAt(0).toUpperCase();
-            
             return (
               <div
                 key={carrier.id}
-                className={`${styles.card} ${viewMode === "list" ? styles.cardList : ""} ${isMyTrip ? styles.myTripCard : ""}`}
+                className={`${styles.card} ${viewMode === "list" ? styles.cardList : ""}`}
               >
                 <div className={styles.cardHeader}>
-                  <div 
-                    className={styles.avatarWrapper}
-                    onClick={() => !isMyTrip && router.push(`/profile?userId=${carrier.carrierUid}`)}
-                    style={{ cursor: isMyTrip ? 'default' : 'pointer' }}
-                  >
-                    <div 
-                      className={styles.avatar}
-                      style={{ background: getAvatarColor(carrierName) }}
-                    >
-                      {avatarLetter}
-                    </div>
-                    {!isMyTrip && (
-                      <div className={styles.viewProfileHint}>
-                        <i className="fa-solid fa-eye"></i>
-                        View Profile
-                      </div>
-                    )}
+                  <div className={styles.avatar}>
+                    {carrier.avatar || carrier.userName?.charAt(0) || "U"}
                   </div>
                   <div className={styles.headerInfo}>
                     <h3 className={styles.cardName}>
-                      {carrierName}
-                      {isMyTrip && <span className={styles.youBadge}>Your Trip</span>}
+                      {carrier.carrierName || carrier.userName || carrier.name || "Carrier"}
+                      {isMyTrip && <span className={styles.youBadge}>(You)</span>}
                     </h3>
                     <div className={styles.routeInfo}>
-                      <div className={styles.route}>
-                        <i className="fa-solid fa-location-dot" style={{ color: '#667eea' }}></i>
-                        <span className={styles.routeText}>{carrier.from}</span>
-                        <i className="fa-solid fa-arrow-right" style={{ color: '#a0aec0' }}></i>
-                        <i className="fa-solid fa-location-dot" style={{ color: '#f5576c' }}></i>
-                        <span className={styles.routeText}>{carrier.to}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className={styles.transportBadge}>
-                    <i className={`fa-solid ${getTransportIcon(carrier.transportType)}`}></i>
-                    {carrier.transportType}
-                  </div>
-                </div>
-
-                <div className={styles.cardBody}>
-                  <div className={styles.infoGrid}>
-                    <div className={styles.infoItem}>
-                      <i className="fa-regular fa-calendar"></i>
-                      <span>
+                      <span className={styles.routeText}>
+                        {carrier.from} → {carrier.to}
+                      </span>
+                      <span className={styles.cardDate}>
                         {(carrier.date?.toDate
                           ? carrier.date.toDate()
                           : new Date(carrier.date)
-                        ).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        ).toLocaleDateString()}
                       </span>
                     </div>
-                    <div className={styles.infoItem}>
-                      <i className="fa-solid fa-box"></i>
-                      <span>{carrier.packageSize}</span>
-                    </div>
-                    {carrier.maxWeight && (
-                      <div className={styles.infoItem}>
-                        <i className="fa-solid fa-weight-hanging"></i>
-                        <span>{carrier.maxWeight} kg max</span>
-                      </div>
-                    )}
                   </div>
-                  
+                  <span className={styles.badge}>{carrier.transportType}</span>
+                </div>
+
+                <div className={styles.cardBody}>
+                  <p className={styles.packageSize}>
+                    <i className="fa-solid fa-box"></i> {carrier.packageSize}
+                  </p>
                   {carrier.description && (
-                    <p className={styles.description}>
-                      <i className="fa-solid fa-quote-left"></i>
-                      {carrier.description}
-                    </p>
+                    <p className={styles.description}>{carrier.description}</p>
                   )}
                 </div>
 
                 <div className={styles.cardFooter}>
-                  <div className={styles.priceSection}>
-                    <span className={styles.priceLabel}>Total Price</span>
-                    <h3 className={styles.price}>${carrier.price}</h3>
-                  </div>
+                  <h3 className={styles.price}>${carrier.price}</h3>
                   {isMyTrip ? (
                     <button disabled className={styles.bookBtnDisabled}>
-                      <i className="fa-solid fa-ban"></i>
                       Your Trip
                     </button>
                   ) : (
@@ -314,7 +212,6 @@ function FindCarrierContent() {
                       href={`/booking?tripId=${carrier.id}`}
                       className={styles.bookBtn}
                     >
-                      <i className="fa-solid fa-calendar-check"></i>
                       Book Now
                     </Link>
                   )}
@@ -331,12 +228,7 @@ function FindCarrierContent() {
 export default function FindCarrierPage() {
   return (
     <main className={styles.pageWrapper}>
-      <Suspense fallback={
-        <div className={styles.loading}>
-          <div className={styles.spinner}></div>
-          <p>Loading...</p>
-        </div>
-      }>
+      <Suspense fallback={<div>Loading...</div>}>
         <FindCarrierContent />
       </Suspense>
     </main>
