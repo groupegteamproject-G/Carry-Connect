@@ -19,6 +19,24 @@ function FindCarrierContent() {
   const [priceRange, setPriceRange] = useState(1000);
   const [selectedTransport, setSelectedTransport] = useState("All");
 
+  // ✅ ADDED: helper to format carrier name (email → readable name)
+  const formatName = (carrier) => {
+    const raw =
+      carrier.carrierName ||
+      carrier.userName ||
+      carrier.name ||
+      "Carrier";
+
+    if (typeof raw === "string" && raw.includes("@")) {
+      const namePart = raw.split("@")[0];
+      return namePart
+        .replace(/[._-]/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+
+    return raw;
+  };
+
   useEffect(() => {
     let unsubscribeAuth;
     let unsubscribeTrips;
@@ -68,9 +86,9 @@ function FindCarrierContent() {
       }
 
       const matchesSize = !sizeQuery || trip.packageSize === sizeQuery;
-
       const matchesPrice = trip.price <= priceRange;
-      const matchesTransport = selectedTransport === "All" || trip.transportType === selectedTransport;
+      const matchesTransport =
+        selectedTransport === "All" || trip.transportType === selectedTransport;
 
       return matchesFrom && matchesTo && matchesDate && matchesSize && matchesPrice && matchesTransport;
     });
@@ -170,11 +188,11 @@ function FindCarrierContent() {
               >
                 <div className={styles.cardHeader}>
                   <div className={styles.avatar}>
-                    {carrier.avatar || carrier.userName?.charAt(0) || "U"}
+                    {carrier.avatar || formatName(carrier).charAt(0) || "U"}
                   </div>
                   <div className={styles.headerInfo}>
                     <h3 className={styles.cardName}>
-                      {carrier.carrierName || carrier.userName || carrier.name || "Carrier"}
+                      {formatName(carrier)}
                       {isMyTrip && <span className={styles.youBadge}>(You)</span>}
                     </h3>
                     <div className={styles.routeInfo}>
